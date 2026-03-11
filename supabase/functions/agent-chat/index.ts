@@ -145,10 +145,11 @@ serve(async (req) => {
         const accessToken = await getGmailAccessToken(bloomsuiteRefreshToken);
         const inboxSummary = await fetchInboxSummary(accessToken);
         console.log("BloomSuite agent: fetched inbox summary, length:", inboxSummary.length);
+        const draftInstructions = `\n\n## Drafting Emails\nWhen the user asks you to draft, reply to, or compose an email for the jon@brandsinblooms.com account, format the draft using EXACTLY this structure so it gets automatically saved to Gmail Drafts:\n\n[DRAFT]\nTo: recipient@example.com\nSubject: Re: Subject line\nBody: The full email body text here\n[/DRAFT]\n\nYou can include multiple [DRAFT]...[/DRAFT] blocks if needed. The draft will be saved automatically — confirm to the user that the draft has been saved to Gmail.\n`;
         const inboxContext = inboxSummary.length > 0
-          ? "## BloomSuite Inbox (unread)\n\n" + inboxSummary
+          ? "## BloomSuite Inbox (unread)\nYou have LIVE access to Jon's jon@brandsinblooms.com inbox. The following are REAL unread emails fetched just now.\n\n" + inboxSummary
           : "## BloomSuite Inbox\n\nNo unread emails for jon@brandsinblooms.com.";
-        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
+        systemPrompt = inboxContext + draftInstructions + "\n\n---\n\n" + systemPrompt;
       } catch (e) {
         console.error("Failed to fetch BloomSuite inbox:", e);
         systemPrompt = "## BloomSuite Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
@@ -201,16 +202,18 @@ serve(async (req) => {
     const data = await response.json();
     const text = data.content?.[0]?.text || "No response generated.";
 
-    // For inbox agent, parse and save any draft blocks
-    if (agentId === "inbox") {
+    // For inbox or bloomsuite agent, parse and save any draft blocks
+    if (agentId === "inbox" || agentId === "bloomsuite") {
       const drafts = parseDraftBlocks(text);
       if (drafts.length > 0) {
         try {
-          const accessToken = await getGmailAccessToken();
+          const accessToken = agentId === "bloomsuite"
+            ? await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "")
+            : await getGmailAccessToken();
           await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
-          console.log(`Saved ${drafts.length} Gmail draft(s)`);
+          console.log(`Saved ${drafts.length} Gmail draft(s) for ${agentId}`);
         } catch (e) {
-          console.error("Failed to save Gmail drafts:", e);
+          console.error(`Failed to save Gmail drafts for ${agentId}:`, e);
         }
       }
     }
