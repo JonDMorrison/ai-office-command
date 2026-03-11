@@ -6,7 +6,7 @@ interface HeaderBarProps {
   onStartStandup?: () => void;
 }
 
-const HeaderBar = ({ activeCount, waitingCount }: HeaderBarProps) => {
+const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
