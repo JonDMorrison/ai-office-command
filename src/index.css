@@ -117,11 +117,23 @@
   50% { transform: translateY(-3px); }
 }
 
-/* Agent typing animation */
-@keyframes agent-type {
+/* Agent breathing idle */
+@keyframes agent-breathe {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-2px) scale(1.01); }
+}
+
+/* Agent typing animation — quick subtle bounce */
+@keyframes agent-type-img {
   0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-1px) rotate(-1deg); }
-  75% { transform: translateY(-1px) rotate(1deg); }
+  30% { transform: translateY(-1.5px) rotate(-0.8deg); }
+  70% { transform: translateY(-1.5px) rotate(0.8deg); }
+}
+
+/* Agent reading — gentle lean */
+@keyframes agent-read {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-1px) rotate(1deg); }
 }
 
 /* Blink animation */
