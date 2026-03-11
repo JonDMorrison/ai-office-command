@@ -38,7 +38,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <HeaderBar activeCount={activeCount} waitingCount={waitingCount} />
+      <HeaderBar activeCount={activeCount} waitingCount={waitingCount} onStartStandup={() => setStandupActive(true)} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Isometric office floor */}
