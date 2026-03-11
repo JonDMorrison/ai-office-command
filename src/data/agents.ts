@@ -179,6 +179,9 @@ You speak with authority about clinic operations, leadership structure, and the 
     colorVar: 'agent-project',
     colorHex: '#f59e0b',
     avatar: '🏗️',
+    hairColor: '#d4a574',
+    hairStyle: 'slick',
+    skinTone: '#f5d0a9',
     status: 'active',
     currentTask: 'Analyzing estimate-vs-actual variance on Phase 3...',
     systemPrompt: `You are the ProjectPath Agent — the definitive expert on everything Project Path, the Construction Operating System. You serve as support specialist, coding expert, industry specialist, and general advisor for all things construction project management.
