@@ -83,14 +83,17 @@ const getBubbleStyle = (state: string, agentColor: string) => {
 };
 
 const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProps) => {
-  const { state, taskIndex } = dynamicState;
+  const { state, taskIndex, standupOverride } = dynamicState;
   const isTyping = state === 'typing';
   const isReading = state === 'reading';
   const isActive = isTyping || isReading;
   const isWaiting = state === 'waiting';
 
-  const bubble = getBubbleStyle(state, agent.colorHex);
-  const showTaskText = isTyping || isReading;
+  // If standup override is set, show that instead
+  const bubble = standupOverride
+    ? { bg: '#f0fdf4', border: '#22c55e', color: '#1a1a1a', label: '✦ Working on it...' }
+    : getBubbleStyle(state, agent.colorHex);
+  const showTaskText = !standupOverride && (isTyping || isReading);
 
   return (
     <div
