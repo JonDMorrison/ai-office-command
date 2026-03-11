@@ -8,6 +8,50 @@ interface PixelAgentProps {
   dynamicState: AgentDynamicState;
 }
 
+const HairRenderer = ({ style, color, width }: { style: Agent['hairStyle']; color: string; width: number }) => {
+  switch (style) {
+    case 'short':
+      return (
+        <div className="absolute -top-1.5 left-0 right-0 flex justify-center">
+          <div className="rounded-t-md" style={{ width: width + 2, height: 6, backgroundColor: color }} />
+        </div>
+      );
+    case 'long':
+      return (
+        <>
+          <div className="absolute -top-2 left-0 right-0 flex justify-center">
+            <div className="rounded-t-lg" style={{ width: width + 4, height: 8, backgroundColor: color }} />
+          </div>
+          <div className="absolute top-1 -left-1" style={{ width: 3, height: 14, backgroundColor: color, borderRadius: '0 0 2px 2px' }} />
+          <div className="absolute top-1 -right-1" style={{ width: 3, height: 14, backgroundColor: color, borderRadius: '0 0 2px 2px' }} />
+        </>
+      );
+    case 'spiky':
+      return (
+        <div className="absolute -top-2.5 left-0 right-0 flex justify-center gap-[1px]">
+          {[6, 9, 7, 10, 6].map((h, i) => (
+            <div key={i} style={{ width: 3, height: h, backgroundColor: color, borderRadius: '2px 2px 0 0' }} />
+          ))}
+        </div>
+      );
+    case 'curly':
+      return (
+        <div className="absolute -top-2 left-0 right-0 flex justify-center">
+          <div style={{ width: width + 6, height: 9, backgroundColor: color, borderRadius: '8px 8px 2px 2px' }} />
+        </div>
+      );
+    case 'slick':
+      return (
+        <div className="absolute -top-1 left-0 right-0 flex justify-center">
+          <div style={{ width: width + 2, height: 5, backgroundColor: color, borderRadius: '4px 4px 0 0' }} />
+          <div className="absolute top-0 -right-0.5" style={{ width: 4, height: 7, backgroundColor: color, borderRadius: '0 4px 2px 0', transform: 'skewX(-8deg)' }} />
+        </div>
+      );
+    default:
+      return null;
+  }
+};
+
 const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProps) => {
   const { state, taskIndex, bobOffset, blinkOn } = dynamicState;
   const isTyping = state === 'typing';
@@ -19,11 +63,13 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
     : isReading ? '#7dd3fc'
     : '#334155';
 
+  // Subtle breathing animation offset
+  const breathOffset = bobOffset * 0.5;
+
   return (
     <div
       className={`relative flex flex-col items-center cursor-pointer transition-transform duration-200 ${isSelected ? 'scale-105' : 'hover:scale-105'}`}
       onClick={onClick}
-      style={{ transform: `translateY(${bobOffset}px)` }}
     >
       {/* Speech bubble */}
       {(isTyping || isWaiting) && (
@@ -47,81 +93,111 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
         </div>
       )}
 
-      {/* Agent body */}
-      <div className="relative">
-        {/* Head with avatar */}
-        <div
-          className="w-10 h-10 rounded-sm border-2 relative flex items-center justify-center"
-          style={{
-            background: `linear-gradient(135deg, ${agent.colorHex}40, ${agent.colorHex}15)`,
-            borderColor: agent.colorHex,
-            boxShadow: `0 0 12px ${agent.colorHex}40`,
-          }}
-        >
-          <span className="text-sm z-10">{agent.avatar}</span>
-          {/* Eyes */}
-          <div className="absolute bottom-1.5 left-1.5 flex gap-2">
+      {/* Human character */}
+      <div className="relative" style={{ transform: `translateY(${breathOffset}px)`, transition: 'transform 0.6s ease-in-out' }}>
+        {/* Head */}
+        <div className="relative flex justify-center">
+          <div
+            className="w-11 h-11 rounded-full relative"
+            style={{ backgroundColor: agent.skinTone, boxShadow: `0 2px 8px rgba(0,0,0,0.3)` }}
+          >
+            {/* Hair */}
+            <HairRenderer style={agent.hairStyle} color={agent.hairColor} width={44} />
+
+            {/* Face */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center pt-1.5">
+              {/* Eyes */}
+              <div className="flex gap-2.5 mb-0.5">
+                <div
+                  className="w-2 rounded-full transition-all duration-100"
+                  style={{
+                    backgroundColor: '#2d1b0e',
+                    height: blinkOn ? 5 : 1,
+                  }}
+                />
+                <div
+                  className="w-2 rounded-full transition-all duration-100"
+                  style={{
+                    backgroundColor: '#2d1b0e',
+                    height: blinkOn ? 5 : 1,
+                  }}
+                />
+              </div>
+              {/* Mouth — expression changes with state */}
+              <div
+                className="mt-0.5 rounded-full"
+                style={{
+                  width: isTyping ? 4 : isWaiting ? 6 : 5,
+                  height: isTyping ? 3 : isWaiting ? 2 : 2,
+                  backgroundColor: isWaiting ? '#d97706' : '#c4816a',
+                  borderRadius: isTyping ? '0 0 50% 50%' : isWaiting ? '2px' : '50%',
+                }}
+              />
+            </div>
+
+            {/* Cheek blush */}
+            <div className="absolute bottom-2.5 left-1 w-2 h-1 rounded-full opacity-30" style={{ backgroundColor: '#e57373' }} />
+            <div className="absolute bottom-2.5 right-1 w-2 h-1 rounded-full opacity-30" style={{ backgroundColor: '#e57373' }} />
+          </div>
+
+          {/* Status indicator */}
+          <div className="absolute -top-0.5 -right-0.5 flex items-center gap-1 z-20">
             <div
-              className="w-1.5 rounded-sm transition-all duration-100"
+              className={`w-2.5 h-2.5 rounded-full border ${(isTyping || isReading) ? 'animate-status-pulse' : ''}`}
               style={{
-                backgroundColor: '#0f172a',
-                height: blinkOn ? '6px' : '1px',
-              }}
-            />
-            <div
-              className="w-1.5 rounded-sm transition-all duration-100"
-              style={{
-                backgroundColor: '#0f172a',
-                height: blinkOn ? '6px' : '1px',
+                backgroundColor: statusColor,
+                borderColor: `${statusColor}80`,
               }}
             />
           </div>
         </div>
 
-        {/* Body */}
-        <div
-          className="w-10 h-6 mt-0.5 rounded-sm border-2"
-          style={{
-            background: `linear-gradient(180deg, ${agent.colorHex}30, ${agent.colorHex}15)`,
-            borderColor: `${agent.colorHex}80`,
-          }}
-        />
-
-        {/* Arms */}
-        <div
-          className="absolute top-[26px] -left-1.5 w-2.5 h-3.5 rounded-sm border transition-transform duration-150"
-          style={{
-            backgroundColor: `${agent.colorHex}30`,
-            borderColor: `${agent.colorHex}60`,
-            transformOrigin: 'top center',
-            transform: isTyping ? `rotate(${bobOffset === -3 ? -15 : 15}deg)` : 'rotate(0deg)',
-          }}
-        />
-        <div
-          className="absolute top-[26px] -right-1.5 w-2.5 h-3.5 rounded-sm border transition-transform duration-150"
-          style={{
-            backgroundColor: `${agent.colorHex}30`,
-            borderColor: `${agent.colorHex}60`,
-            transformOrigin: 'top center',
-            transform: isTyping ? `rotate(${bobOffset === -3 ? 15 : -15}deg)` : 'rotate(0deg)',
-          }}
-        />
-
-        {/* Legs */}
-        <div className="flex justify-center gap-1 -mt-0.5">
-          <div className="w-2.5 h-2.5 rounded-b-sm" style={{ backgroundColor: `${agent.colorHex}25` }} />
-          <div className="w-2.5 h-2.5 rounded-b-sm" style={{ backgroundColor: `${agent.colorHex}25` }} />
+        {/* Neck */}
+        <div className="flex justify-center -mt-0.5">
+          <div className="w-3 h-1.5" style={{ backgroundColor: agent.skinTone }} />
         </div>
 
-        {/* Status indicator */}
-        <div className="absolute -top-1 -right-1 flex items-center gap-1">
+        {/* Shoulders & torso — colored with agent color (clothing) */}
+        <div className="relative flex justify-center -mt-px">
           <div
-            className={`w-2.5 h-2.5 rounded-full border ${(isTyping || isReading) ? 'animate-status-pulse' : ''}`}
+            className="w-16 h-8 rounded-t-lg relative"
             style={{
-              backgroundColor: statusColor,
-              borderColor: `${statusColor}80`,
+              background: `linear-gradient(180deg, ${agent.colorHex}, ${agent.colorHex}cc)`,
+              boxShadow: `0 2px 6px ${agent.colorHex}30`,
             }}
-          />
+          >
+            {/* Collar / shirt detail */}
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-4 h-2" style={{ backgroundColor: `${agent.colorHex}dd`, borderRadius: '0 0 4px 4px' }} />
+            {/* Subtle shirt texture lines */}
+            <div className="absolute bottom-1 left-2 right-2 flex flex-col gap-0.5 opacity-20">
+              <div className="h-px" style={{ backgroundColor: '#000' }} />
+              <div className="h-px" style={{ backgroundColor: '#000' }} />
+            </div>
+          </div>
+
+          {/* Arms with skin tone hands */}
+          <div
+            className="absolute top-0 -left-2 w-3 h-7 rounded-md transition-transform duration-150"
+            style={{
+              background: `linear-gradient(180deg, ${agent.colorHex}, ${agent.colorHex}cc)`,
+              transformOrigin: 'top center',
+              transform: isTyping ? `rotate(${bobOffset === -3 ? -20 : 20}deg)` : 'rotate(5deg)',
+            }}
+          >
+            {/* Hand */}
+            <div className="absolute -bottom-1 left-0 w-3 h-2 rounded-full" style={{ backgroundColor: agent.skinTone }} />
+          </div>
+          <div
+            className="absolute top-0 -right-2 w-3 h-7 rounded-md transition-transform duration-150"
+            style={{
+              background: `linear-gradient(180deg, ${agent.colorHex}, ${agent.colorHex}cc)`,
+              transformOrigin: 'top center',
+              transform: isTyping ? `rotate(${bobOffset === -3 ? 20 : -20}deg)` : 'rotate(-5deg)',
+            }}
+          >
+            {/* Hand */}
+            <div className="absolute -bottom-1 left-0 w-3 h-2 rounded-full" style={{ backgroundColor: agent.skinTone }} />
+          </div>
         </div>
       </div>
 
@@ -145,7 +221,6 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
             boxShadow: isTyping ? `0 0 12px ${agent.colorHex}40` : 'none',
           }}
         >
-          {/* Screen content based on state */}
           {isTyping && (
             <div className="w-10 space-y-0.5 overflow-hidden p-0.5">
               {[...Array(3)].map((_, i) => (
