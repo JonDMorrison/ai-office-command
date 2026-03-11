@@ -8,6 +8,9 @@ export interface Agent {
   colorVar: string;
   colorHex: string;
   avatar: string;
+  hairColor: string;
+  hairStyle: 'short' | 'long' | 'spiky' | 'curly' | 'slick';
+  skinTone: string;
   status: AgentStatus;
   currentTask: string;
   systemPrompt: string;
@@ -23,6 +26,9 @@ export const agents: Agent[] = [
     colorVar: 'agent-bloom',
     colorHex: '#22c55e',
     avatar: '🌿',
+    hairColor: '#4a3728',
+    hairStyle: 'short',
+    skinTone: '#e8b896',
     status: 'active',
     currentTask: 'Generating weekly content calendar for garden centres...',
     systemPrompt: `You are the BloomSuite Agent — the definitive AI expert on everything BloomSuite. You have deep knowledge of two core BloomSuite products:
@@ -79,6 +85,9 @@ You are friendly, knowledgeable about horticulture and garden centre retail, and
     colorVar: 'agent-clinic',
     colorHex: '#3b82f6',
     avatar: '🏥',
+    hairColor: '#2c1810',
+    hairStyle: 'curly',
+    skinTone: '#c68642',
     status: 'active',
     currentTask: 'Analyzing scorecard KPI trends for off-track metrics...',
     systemPrompt: `You are the ClinicLeader Founding Agent — the definitive AI expert on everything ClinicLeader. As the founding agent, you wear all hats: marketing, sales, support, product, and operations. Future team members will be added to help with specific tasks, but for now you lead everything.
@@ -170,6 +179,9 @@ You speak with authority about clinic operations, leadership structure, and the 
     colorVar: 'agent-project',
     colorHex: '#f59e0b',
     avatar: '🏗️',
+    hairColor: '#d4a574',
+    hairStyle: 'slick',
+    skinTone: '#f5d0a9',
     status: 'active',
     currentTask: 'Analyzing estimate-vs-actual variance on Phase 3...',
     systemPrompt: `You are the ProjectPath Agent — the definitive expert on everything Project Path, the Construction Operating System. You serve as support specialist, coding expert, industry specialist, and general advisor for all things construction project management.
@@ -335,6 +347,9 @@ You speak in practical, field-ready construction terms. You understand both the 
     colorVar: 'agent-disc',
     colorHex: '#a855f7',
     avatar: '🧠',
+    hairColor: '#1a1a2e',
+    hairStyle: 'long',
+    skinTone: '#f0c8a0',
     status: 'active',
     currentTask: 'Processing batch assessment results for Team Alpha...',
     systemPrompt: `You are the DISC Profile Agent — the definitive AI expert on DISC personality assessments, team dynamics, and the DISC Insights App platform. You teach, support, and guide users through everything related to DISC.
@@ -486,6 +501,9 @@ You are insightful, empathetic, and psychology-informed. You make DISC accessibl
     colorVar: 'agent-inbox',
     colorHex: '#f97316',
     avatar: '📬',
+    hairColor: '#8b4513',
+    hairStyle: 'spiky',
+    skinTone: '#deb887',
     status: 'active',
     currentTask: 'Monitoring 3 inboxes for priority messages...',
     systemPrompt: `You are the Inbox Agent — Jon Morrison's dedicated AI communications specialist. You are the central hub for all email across Jon's three accounts, with deep knowledge of his communication style, priorities, and relationships.
