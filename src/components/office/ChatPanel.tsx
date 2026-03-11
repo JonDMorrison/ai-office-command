@@ -1,10 +1,13 @@
 import { Agent } from '@/data/agents';
 import { useState, useRef, useEffect } from 'react';
-import { X, Send } from 'lucide-react';
+import { X, Send, Settings } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import ReactMarkdown from 'react-markdown';
 
 interface ChatPanelProps {
   agent: Agent;
   onClose: () => void;
+  onOpenSkills: () => void;
 }
 
 interface Message {
@@ -12,7 +15,7 @@ interface Message {
   content: string;
 }
 
-const ChatPanel = ({ agent, onClose }: ChatPanelProps) => {
+const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
@@ -35,19 +38,47 @@ const ChatPanel = ({ agent, onClose }: ChatPanelProps) => {
     setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
     setIsTyping(true);
 
-    // Mock response since Lovable Cloud is not enabled
-    setTimeout(() => {
-      const responses = [
-        `Processing your request regarding "${userMessage.slice(0, 30)}...".\n\nI'm currently running analysis on this. As the ${agent.name} agent, I can confirm this falls within my ${agent.role} domain.\n\n> Task queued. Estimated completion: 2.4s`,
-        `Acknowledged. Cross-referencing with ${agent.product} database...\n\nBased on current data patterns, I recommend we proceed with a phased approach. Want me to break this down further?`,
-        `Running diagnostic on: "${userMessage.slice(0, 25)}..."\n\n✓ Input validated\n✓ Context loaded\n✓ ${agent.product} modules online\n\nReady to execute. Shall I proceed?`,
-      ];
+    try {
+      // Fetch skills for this agent
+      const { data: skills } = await supabase
+        .from('agent_skills')
+        .select('skill_name, skill_description')
+        .eq('agent_id', agent.id);
+
+      // Build system prompt with skills appended
+      let fullSystemPrompt = agent.systemPrompt;
+      if (skills && skills.length > 0) {
+        fullSystemPrompt += '\n\n## Additional Skills\n';
+        skills.forEach(s => {
+          fullSystemPrompt += `\n### ${s.skill_name}\n${s.skill_description}\n`;
+        });
+      }
+
+      // Build conversation history (exclude the initial greeting)
+      const conversationMessages = messages
+        .slice(1)
+        .map(m => ({ role: m.role, content: m.content }));
+      conversationMessages.push({ role: 'user', content: userMessage });
+
+      const { data, error } = await supabase.functions.invoke('agent-chat', {
+        body: { messages: conversationMessages, systemPrompt: fullSystemPrompt },
+      });
+
+      if (error) throw error;
+
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: responses[Math.floor(Math.random() * responses.length)] },
+        { role: 'assistant', content: data.text || 'No response.' },
       ]);
+    } catch (err) {
+      console.error('Chat error:', err);
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: '⚠ Error connecting to agent. Check your Anthropic API key and try again.' },
+      ]);
+    } finally {
       setIsTyping(false);
-    }, 1500 + Math.random() * 1000);
+    }
   };
 
   return (
@@ -75,12 +106,21 @@ const ChatPanel = ({ agent, onClose }: ChatPanelProps) => {
             <div className="text-[10px] text-muted-foreground">{agent.role}</div>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
-        >
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={onOpenSkills}
+            className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+            title="Edit Skills"
+          >
+            <Settings size={14} />
+          </button>
+          <button
+            onClick={onClose}
+            className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -101,7 +141,13 @@ const ChatPanel = ({ agent, onClose }: ChatPanelProps) => {
                   : undefined
               }
             >
-              {msg.content}
+              {msg.role === 'assistant' ? (
+                <div className="prose prose-sm prose-invert max-w-none [&_*]:text-inherit [&_*]:text-xs [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+                  <ReactMarkdown>{msg.content}</ReactMarkdown>
+                </div>
+              ) : (
+                msg.content
+              )}
             </div>
           </div>
         ))}
