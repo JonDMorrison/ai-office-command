@@ -83,12 +83,12 @@ async function saveGmailDraft(accessToken: string, to: string, subject: string, 
     },
     body: JSON.stringify({ message: { raw: encoded } }),
   });
-  if (!res.ok) {
-    const err = await res.text();
-    console.error("Failed to save Gmail draft:", res.status, err);
+  if (res.ok) {
+    const responseData = await res.text();
+    console.log(`Draft saved successfully: To=${to}, Subject=${subject}, Response: ${responseData}`);
   } else {
-    await res.text();
-    console.log(`Draft saved: To=${to}, Subject=${subject}`);
+    const err = await res.text();
+    console.error(`Failed to save Gmail draft: ${res.status} - ${err}`);
   }
 }
 
