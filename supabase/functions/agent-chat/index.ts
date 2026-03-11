@@ -33,10 +33,6 @@ async function getGmailAccessToken(): Promise<string> {
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
   const refreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
   
-  console.log("Gmail OAuth debug - client_id starts with:", clientId.substring(0, 10), "length:", clientId.length);
-  console.log("Gmail OAuth debug - client_secret starts with:", clientSecret.substring(0, 8), "length:", clientSecret.length);
-  console.log("Gmail OAuth debug - refresh_token starts with:", refreshToken.substring(0, 10), "length:", refreshToken.length);
-  
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
