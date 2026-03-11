@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 interface HeaderBarProps {
   activeCount: number;
   waitingCount: number;
+  onStartStandup?: () => void;
 }
 
 const HeaderBar = ({ activeCount, waitingCount }: HeaderBarProps) => {
