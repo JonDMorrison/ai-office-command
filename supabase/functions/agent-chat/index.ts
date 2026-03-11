@@ -28,6 +28,43 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
+async function getGmailAccessToken(): Promise<string> {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: Deno.env.get("GMAIL_CLIENT_ID") || "",
+      client_secret: Deno.env.get("GMAIL_CLIENT_SECRET") || "",
+      refresh_token: Deno.env.get("GMAIL_REFRESH_TOKEN") || "",
+      grant_type: "refresh_token",
+    }),
+  });
+  const data = await res.json();
+  return data.access_token;
+}
+
+async function fetchInboxSummary(accessToken: string): Promise<string> {
+  const listRes = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=is:unread",
+    { headers: { Authorization: `Bearer ${accessToken}` } }
+  );
+  const listData = await listRes.json();
+  const messages = listData.messages || [];
+  const summaries = await Promise.all(messages.map(async (msg: any) => {
+    const msgRes = await fetch(
+      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    const msgData = await msgRes.json();
+    const headers = msgData.payload?.headers || [];
+    const subject = headers.find((h: any) => h.name === "Subject")?.value || "(no subject)";
+    const from = headers.find((h: any) => h.name === "From")?.value || "unknown";
+    const snippet = msgData.snippet || "";
+    return `From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
+  }));
+  return summaries.join("\n\n");
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -57,47 +94,37 @@ serve(async (req) => {
       console.warn(`No skills mapped for agentId: ${agentId}`);
     }
 
-    // Fetch all skills in parallel
     const skillContents = await Promise.all(
       skillNames.map(name => fetchSkillContent(name, GITHUB_TOKEN))
     );
 
-    const systemPrompt = skillContents.join("\n\n---\n\n");
+    let systemPrompt = skillContents.join("\n\n---\n\n");
 
-    // MCP servers — Inbox agent gets Gmail access
-    const mcpServers = agentId === 'inbox' ? [
-      {
-        type: "url",
-        url: "https://gmail.mcp.claude.com/mcp",
-        name: "gmail",
-      },
-    ] : [];
-
-    const headers: Record<string, string> = {
-      "x-api-key": ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    };
-
-    if (mcpServers.length > 0) {
-      headers["anthropic-beta"] = "mcp-client-2025-04-04";
-    }
-
-    const requestBody: Record<string, unknown> = {
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages,
-    };
-
-    if (mcpServers.length > 0) {
-      requestBody.mcp_servers = mcpServers;
+    // For inbox agent, prepend live Gmail context
+    if (agentId === "inbox") {
+      try {
+        const accessToken = await getGmailAccessToken();
+        const inboxSummary = await fetchInboxSummary(accessToken);
+        systemPrompt = "## Current Inbox (unread)\n\n" + inboxSummary + "\n\n---\n\n" + systemPrompt;
+      } catch (e) {
+        console.error("Failed to fetch Gmail inbox:", e);
+        systemPrompt = "## Current Inbox\n\n[Could not fetch inbox — Gmail API error]\n\n---\n\n" + systemPrompt;
+      }
     }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers,
-      body: JSON.stringify(requestBody),
+      headers: {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages,
+      }),
     });
 
     if (!response.ok) {
