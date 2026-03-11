@@ -29,13 +29,21 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
 }
 
 async function getGmailAccessToken(): Promise<string> {
+  const clientId = Deno.env.get("GMAIL_CLIENT_ID") || "";
+  const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
+  const refreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
+  
+  console.log("Gmail OAuth debug - client_id starts with:", clientId.substring(0, 10), "length:", clientId.length);
+  console.log("Gmail OAuth debug - client_secret starts with:", clientSecret.substring(0, 8), "length:", clientSecret.length);
+  console.log("Gmail OAuth debug - refresh_token starts with:", refreshToken.substring(0, 10), "length:", refreshToken.length);
+  
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
-      client_id: Deno.env.get("GMAIL_CLIENT_ID") || "",
-      client_secret: Deno.env.get("GMAIL_CLIENT_SECRET") || "",
-      refresh_token: Deno.env.get("GMAIL_REFRESH_TOKEN") || "",
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
       grant_type: "refresh_token",
     }),
   });
