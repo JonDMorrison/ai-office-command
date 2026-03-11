@@ -28,10 +28,10 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
-async function getGmailAccessToken(): Promise<string> {
+async function getGmailAccessToken(refreshTokenOverride?: string): Promise<string> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
-  const refreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
+  const refreshToken = refreshTokenOverride || Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
   
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
