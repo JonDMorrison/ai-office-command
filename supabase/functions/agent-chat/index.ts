@@ -72,6 +72,36 @@ async function fetchInboxSummary(accessToken: string): Promise<string> {
   return summaries.join("\n\n");
 }
 
+async function saveGmailDraft(accessToken: string, to: string, subject: string, body: string): Promise<void> {
+  const email = [`To: ${to}`, `Subject: ${subject}`, `Content-Type: text/plain; charset=utf-8`, ``, body].join("\n");
+  const encoded = btoa(unescape(encodeURIComponent(email))).replace(/\+/g, "-").replace(/\//g, "_");
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message: { raw: encoded } }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Failed to save Gmail draft:", res.status, err);
+  } else {
+    await res.text();
+    console.log(`Draft saved: To=${to}, Subject=${subject}`);
+  }
+}
+
+function parseDraftBlocks(text: string): Array<{ to: string; subject: string; body: string }> {
+  const drafts: Array<{ to: string; subject: string; body: string }> = [];
+  const regex = /\[DRAFT\]\s*\nTo:\s*(.+)\nSubject:\s*(.+)\nBody:\s*([\s\S]*?)\[\/DRAFT\]/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    drafts.push({ to: match[1].trim(), subject: match[2].trim(), body: match[3].trim() });
+  }
+  return drafts;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -115,10 +145,11 @@ serve(async (req) => {
         console.log("Inbox agent: access token obtained:", accessToken ? "yes" : "NO TOKEN");
         const inboxSummary = await fetchInboxSummary(accessToken);
         console.log("Inbox agent: fetched inbox summary, length:", inboxSummary.length);
+        const draftInstructions = `\n\n## Drafting Emails\nWhen the user asks you to draft, reply to, or compose an email, format the draft using EXACTLY this structure so it gets automatically saved to Gmail Drafts:\n\n[DRAFT]\nTo: recipient@example.com\nSubject: Re: Subject line\nBody: The full email body text here\n[/DRAFT]\n\nYou can include multiple [DRAFT]...[/DRAFT] blocks if needed. The draft will be saved automatically — confirm to the user that the draft has been saved to Gmail.\n`;
         const inboxContext = inboxSummary.length > 0
           ? "## Current Inbox (unread)\nYou have LIVE access to Jon's inbox. The following are REAL unread emails fetched just now. Use this data to answer questions about the inbox. Do NOT tell the user you can't access their email — you already have it.\n\n" + inboxSummary
           : "## Current Inbox\nYou have live Gmail access but there are currently no unread emails. Tell the user their inbox is clear.";
-        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
+        systemPrompt = inboxContext + draftInstructions + "\n\n---\n\n" + systemPrompt;
       } catch (e) {
         console.error("Failed to fetch Gmail inbox:", e);
         systemPrompt = "## Current Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
@@ -151,6 +182,20 @@ serve(async (req) => {
 
     const data = await response.json();
     const text = data.content?.[0]?.text || "No response generated.";
+
+    // For inbox agent, parse and save any draft blocks
+    if (agentId === "inbox") {
+      const drafts = parseDraftBlocks(text);
+      if (drafts.length > 0) {
+        try {
+          const accessToken = await getGmailAccessToken();
+          await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
+          console.log(`Saved ${drafts.length} Gmail draft(s)`);
+        } catch (e) {
+          console.error("Failed to save Gmail drafts:", e);
+        }
+      }
+    }
 
     return new Response(
       JSON.stringify({ text }),
