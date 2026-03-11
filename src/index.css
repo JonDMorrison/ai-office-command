@@ -51,6 +51,13 @@
     --agent-project: 35 75% 52%;
     --agent-disc: 265 45% 55%;
     --agent-inbox: 15 70% 55%;
+
+    /* Isometric office */
+    --floor-bg: 40 20% 96%;
+    --floor-grid: 30 15% 88%;
+    --desk-top: 30 35% 72%;
+    --desk-side: 30 30% 60%;
+    --desk-shadow: 30 20% 50%;
   }
 }
 
@@ -70,24 +77,205 @@
   font-family: 'Press Start 2P', monospace;
 }
 
-/* Warm wood floor */
-.office-floor {
-  background-color: hsl(30 40% 78%);
+/* ===== Isometric Office Floor ===== */
+.iso-floor {
+  background-color: hsl(var(--floor-bg));
   background-image:
-    repeating-linear-gradient(
-      90deg,
-      transparent,
-      transparent 120px,
-      hsla(30, 30%, 65%, 0.15) 120px,
-      hsla(30, 30%, 65%, 0.15) 121px
-    ),
-    repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 20px,
-      hsla(30, 25%, 70%, 0.08) 20px,
-      hsla(30, 25%, 70%, 0.08) 21px
-    );
+    linear-gradient(hsl(var(--floor-grid) / 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--floor-grid) / 0.35) 1px, transparent 1px);
+  background-size: 48px 48px;
+}
+
+/* ===== Isometric Desk Pod ===== */
+.iso-desk {
+  position: relative;
+  width: 140px;
+  height: 70px;
+}
+
+.iso-desk-surface {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(135deg, hsl(30 40% 76%) 0%, hsl(30 35% 70%) 100%);
+  border-radius: 6px;
+  box-shadow:
+    0 4px 0 hsl(30 30% 58%),
+    0 8px 16px hsl(30 20% 50% / 0.2);
+}
+
+/* Monitor on desk */
+.iso-monitor {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 28px;
+  background: hsl(220 15% 18%);
+  border-radius: 3px;
+  border: 2px solid hsl(220 10% 30%);
+  box-shadow: 0 2px 6px hsl(220 20% 10% / 0.3);
+}
+
+.iso-monitor::after {
+  content: '';
+  position: absolute;
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 8px;
+  background: hsl(220 10% 35%);
+  border-radius: 0 0 2px 2px;
+}
+
+/* Monitor screen glow */
+.iso-monitor-glow {
+  position: absolute;
+  inset: 3px;
+  border-radius: 1px;
+  opacity: 0.6;
+}
+
+/* ===== Desk Pod Container ===== */
+.desk-pod {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.desk-pod:hover {
+  transform: scale(1.04);
+}
+
+.desk-pod.selected {
+  transform: scale(1.06);
+}
+
+/* Active glow ring around desk */
+.desk-glow {
+  position: absolute;
+  inset: -8px;
+  border-radius: 16px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.desk-pod.active .desk-glow,
+.desk-pod.selected .desk-glow {
+  opacity: 1;
+}
+
+/* ===== Character float (idle) ===== */
+@keyframes iso-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-2px); }
+}
+
+.iso-character {
+  animation: iso-float 2s ease-in-out infinite;
+}
+
+/* ===== Speech bubble pulse ===== */
+@keyframes bubble-pulse {
+  0%, 100% { transform: translateX(-50%) scale(1); opacity: 1; }
+  50% { transform: translateX(-50%) scale(1.05); opacity: 0.85; }
+}
+
+.iso-bubble {
+  animation: bubble-pulse 2s ease-in-out infinite;
+}
+
+/* ===== Nameplate ===== */
+.iso-nameplate {
+  background: hsl(0 0% 100% / 0.9);
+  backdrop-filter: blur(4px);
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  padding: 4px 10px;
+  text-align: center;
+  box-shadow: 0 1px 3px hsl(30 20% 50% / 0.1);
+}
+
+/* ===== Office Props ===== */
+.iso-prop {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Whiteboard */
+.iso-whiteboard {
+  width: 80px;
+  height: 50px;
+  background: hsl(0 0% 98%);
+  border: 2px solid hsl(30 15% 80%);
+  border-radius: 4px;
+  box-shadow: 0 2px 8px hsl(30 20% 50% / 0.15);
+}
+
+.iso-whiteboard::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  height: 2px;
+  background: hsl(210 50% 70% / 0.4);
+  box-shadow:
+    0 8px 0 hsl(150 40% 60% / 0.3),
+    0 16px 0 hsl(350 50% 65% / 0.3);
+}
+
+/* Water cooler */
+.iso-watercooler {
+  width: 24px;
+  height: 40px;
+  background: linear-gradient(180deg, hsl(200 60% 85%) 0%, hsl(200 50% 75%) 60%, hsl(0 0% 85%) 60%);
+  border-radius: 4px;
+  border: 1px solid hsl(200 30% 70%);
+  box-shadow: 0 2px 6px hsl(200 20% 40% / 0.15);
+}
+
+.iso-watercooler::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 10px;
+  background: hsl(200 70% 70%);
+  border-radius: 3px 3px 0 0;
+  border: 1px solid hsl(200 40% 60%);
+}
+
+/* Plant pot */
+.iso-plant {
+  width: 28px;
+  height: 20px;
+  background: linear-gradient(180deg, hsl(15 45% 55%) 0%, hsl(15 40% 45%) 100%);
+  border-radius: 2px 2px 4px 4px;
+  position: relative;
+}
+
+.iso-plant::before {
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 22px;
+  background: radial-gradient(ellipse, hsl(140 50% 40%) 0%, hsl(140 45% 30%) 100%);
+  border-radius: 50% 50% 30% 30%;
 }
 
 /* Agent breathing idle */
