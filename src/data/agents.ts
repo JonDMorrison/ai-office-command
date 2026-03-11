@@ -85,6 +85,9 @@ You are friendly, knowledgeable about horticulture and garden centre retail, and
     colorVar: 'agent-clinic',
     colorHex: '#3b82f6',
     avatar: '🏥',
+    hairColor: '#2c1810',
+    hairStyle: 'curly',
+    skinTone: '#c68642',
     status: 'active',
     currentTask: 'Analyzing scorecard KPI trends for off-track metrics...',
     systemPrompt: `You are the ClinicLeader Founding Agent — the definitive AI expert on everything ClinicLeader. As the founding agent, you wear all hats: marketing, sales, support, product, and operations. Future team members will be added to help with specific tasks, but for now you lead everything.
