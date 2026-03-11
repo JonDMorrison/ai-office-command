@@ -90,17 +90,6 @@ const Index = () => {
             />
           )}
 
-          {/* Re-launch standup button (bottom-right when dismissed) */}
-          {!standupActive && (
-            <button
-              onClick={() => setStandupActive(true)}
-              className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-lg text-xs font-medium
-                bg-card border border-border text-foreground shadow-sm
-                hover:shadow-md hover:scale-105 transition-all"
-            >
-              ☀️ Standup
-            </button>
-          )}
         </div>
 
         {selectedAgent && (
