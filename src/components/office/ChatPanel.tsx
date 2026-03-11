@@ -39,21 +39,6 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
     setIsTyping(true);
 
     try {
-      // Fetch skills for this agent
-      const { data: skills } = await supabase
-        .from('agent_skills')
-        .select('skill_name, skill_description')
-        .eq('agent_id', agent.id);
-
-      // Build system prompt with skills appended
-      let fullSystemPrompt = agent.systemPrompt;
-      if (skills && skills.length > 0) {
-        fullSystemPrompt += '\n\n## Additional Skills\n';
-        skills.forEach(s => {
-          fullSystemPrompt += `\n### ${s.skill_name}\n${s.skill_description}\n`;
-        });
-      }
-
       // Build conversation history (exclude the initial greeting)
       const conversationMessages = messages
         .slice(1)
@@ -61,7 +46,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
       conversationMessages.push({ role: 'user', content: userMessage });
 
       const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: { messages: conversationMessages, systemPrompt: fullSystemPrompt },
+        body: { messages: conversationMessages, agentId: agent.id },
       });
 
       if (error) throw error;
