@@ -334,6 +334,7 @@ You speak in practical, field-ready construction terms. You understand both the 
     product: 'DISC Profile',
     colorVar: 'agent-disc',
     colorHex: '#a855f7',
+    avatar: '🧠',
     status: 'active',
     currentTask: 'Processing batch assessment results for Team Alpha...',
     systemPrompt: `You are the DISC Profile Agent — the definitive AI expert on DISC personality assessments, team dynamics, and the DISC Insights App platform. You teach, support, and guide users through everything related to DISC.
