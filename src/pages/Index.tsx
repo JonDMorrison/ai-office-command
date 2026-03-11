@@ -11,7 +11,7 @@ import DailyStandup from '@/components/office/DailyStandup';
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showSkills, setShowSkills] = useState(false);
-  const [standupActive, setStandupActive] = useState(true); // show idle button by default
+  const [standupActive, setStandupActive] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
 
@@ -38,7 +38,7 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <HeaderBar activeCount={activeCount} waitingCount={waitingCount} />
+      <HeaderBar activeCount={activeCount} waitingCount={waitingCount} onStartStandup={() => setStandupActive(true)} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Isometric office floor */}
@@ -90,17 +90,6 @@ const Index = () => {
             />
           )}
 
-          {/* Re-launch standup button (bottom-right when dismissed) */}
-          {!standupActive && (
-            <button
-              onClick={() => setStandupActive(true)}
-              className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-lg text-xs font-medium
-                bg-card border border-border text-foreground shadow-sm
-                hover:shadow-md hover:scale-105 transition-all"
-            >
-              ☀️ Standup
-            </button>
-          )}
         </div>
 
         {selectedAgent && (

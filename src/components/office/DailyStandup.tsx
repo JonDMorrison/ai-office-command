@@ -27,7 +27,7 @@ interface DailyStandupProps {
 }
 
 const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
-  const [phase, setPhase] = useState<StandupPhase>('idle');
+  const [phase, setPhase] = useState<StandupPhase>('walking-in');
   const [presentingIndex, setPresentingIndex] = useState(0);
   const [suggestions, setSuggestions] = useState<Record<string, string>>(FALLBACK_SUGGESTIONS);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
@@ -124,20 +124,6 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
 
   const approvedCount = Object.values(decisions).filter(d => d === 'approved').length;
 
-  if (phase === 'idle') {
-    return (
-      <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-        <button
-          onClick={() => setPhase('walking-in')}
-          className="pointer-events-auto px-5 py-3 rounded-xl text-sm font-semibold shadow-lg
-            bg-card border-2 border-border text-foreground
-            hover:shadow-xl hover:scale-105 transition-all duration-200"
-        >
-          ☀️ Start Daily Standup
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="absolute inset-0 z-30">
