@@ -49,7 +49,7 @@ async function getGmailAccessToken(refreshToken: string): Promise<string> {
   return data.access_token;
 }
 
-async function fetchInboxSummary(accessToken: string): Promise<string> {
+async function fetchInboxSummary(accessToken: string, accountLabel?: string): Promise<string> {
   const listRes = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=is:unread",
     { headers: { Authorization: `Bearer ${accessToken}` } }
