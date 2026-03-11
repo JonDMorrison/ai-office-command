@@ -32,7 +32,15 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps
         </div>
       </div>
 
-      <div className="flex items-center gap-6 text-sm">
+      <div className="flex items-center gap-4 text-sm">
+        {onStartStandup && (
+          <button
+            onClick={onStartStandup}
+            className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-accent hover:shadow-sm transition-all"
+          >
+            ☀️ Daily Standup
+          </button>
+        )}
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-agent-bloom animate-status-pulse" />
           <span className="text-foreground font-medium">{activeCount} active</span>
