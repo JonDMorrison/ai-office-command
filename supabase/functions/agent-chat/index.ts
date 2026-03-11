@@ -66,7 +66,8 @@ async function fetchInboxSummary(accessToken: string, accountLabel?: string): Pr
     const subject = headers.find((h: any) => h.name === "Subject")?.value || "(no subject)";
     const from = headers.find((h: any) => h.name === "From")?.value || "unknown";
     const snippet = msgData.snippet || "";
-    return `From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
+    const acctPrefix = accountLabel ? `[${accountLabel}] ` : "";
+    return `${acctPrefix}From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
   }));
   return summaries.join("\n\n");
 }
