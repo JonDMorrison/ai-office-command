@@ -137,6 +137,24 @@ serve(async (req) => {
 
     let systemPrompt = skillContents.join("\n\n---\n\n");
 
+    // For bloomsuite agent, prepend BloomSuite inbox context
+    if (agentId === "bloomsuite") {
+      try {
+        console.log("BloomSuite agent: fetching Gmail access token for jon@brandsinblooms.com...");
+        const bloomsuiteRefreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "";
+        const accessToken = await getGmailAccessToken(bloomsuiteRefreshToken);
+        const inboxSummary = await fetchInboxSummary(accessToken);
+        console.log("BloomSuite agent: fetched inbox summary, length:", inboxSummary.length);
+        const inboxContext = inboxSummary.length > 0
+          ? "## BloomSuite Inbox (unread)\n\n" + inboxSummary
+          : "## BloomSuite Inbox\n\nNo unread emails for jon@brandsinblooms.com.";
+        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
+      } catch (e) {
+        console.error("Failed to fetch BloomSuite inbox:", e);
+        systemPrompt = "## BloomSuite Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
+      }
+    }
+
     // For inbox agent, prepend live Gmail context
     if (agentId === "inbox") {
       try {
