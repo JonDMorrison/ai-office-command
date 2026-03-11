@@ -8,6 +8,9 @@ export interface Agent {
   colorVar: string;
   colorHex: string;
   avatar: string;
+  hairColor: string;
+  hairStyle: 'short' | 'long' | 'spiky' | 'curly' | 'slick';
+  skinTone: string;
   status: AgentStatus;
   currentTask: string;
   systemPrompt: string;
