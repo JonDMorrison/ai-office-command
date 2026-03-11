@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
 import HeaderBar from '@/components/office/HeaderBar';
@@ -6,26 +6,32 @@ import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel from '@/components/office/ChatPanel';
 import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
+import DailyStandup from '@/components/office/DailyStandup';
 
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showSkills, setShowSkills] = useState(false);
+  const [standupActive, setStandupActive] = useState(true); // show idle button by default
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
-  const { states, activeCount, waitingCount } = useAgentStates();
+  const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
 
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
   };
 
+  const handleStandupApproved = useCallback((approvedIds: string[]) => {
+    setStandupOverrides(approvedIds);
+  }, [setStandupOverrides]);
+
+  const handleStandupDismiss = useCallback(() => {
+    setStandupActive(false);
+  }, []);
+
   // Desk positions: U-shape layout
-  // Back row: 3 desks across the top
-  // Front row: 2 desks on the sides
   const deskPositions = [
-    // Back row (top) — left, center, right
     { top: '8%', left: '12%' },
     { top: '8%', left: '50%', transform: 'translateX(-50%)' },
     { top: '8%', right: '12%' },
-    // Front row — left and right
     { top: '52%', left: '20%' },
     { top: '52%', right: '20%' },
   ];
@@ -39,17 +45,12 @@ const Index = () => {
         <div className="flex-1 iso-floor relative overflow-hidden">
 
           {/* Office props */}
-          {/* Whiteboard — top right area */}
           <div className="iso-prop" style={{ top: '4%', right: '4%' }}>
             <div className="iso-whiteboard" />
           </div>
-
-          {/* Water cooler — bottom left */}
           <div className="iso-prop" style={{ bottom: '18%', left: '5%' }}>
             <div className="iso-watercooler" />
           </div>
-
-          {/* Plants scattered */}
           <div className="iso-prop" style={{ bottom: '12%', left: '8%' }}>
             <div className="iso-plant" />
           </div>
@@ -80,6 +81,26 @@ const Index = () => {
               />
             </div>
           ))}
+
+          {/* Daily Standup overlay */}
+          {standupActive && (
+            <DailyStandup
+              onApproved={handleStandupApproved}
+              onDismiss={handleStandupDismiss}
+            />
+          )}
+
+          {/* Re-launch standup button (bottom-right when dismissed) */}
+          {!standupActive && (
+            <button
+              onClick={() => setStandupActive(true)}
+              className="absolute bottom-4 right-4 z-20 px-3 py-1.5 rounded-lg text-xs font-medium
+                bg-card border border-border text-foreground shadow-sm
+                hover:shadow-md hover:scale-105 transition-all"
+            >
+              ☀️ Standup
+            </button>
+          )}
         </div>
 
         {selectedAgent && (

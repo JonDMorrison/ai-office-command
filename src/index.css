@@ -356,3 +356,14 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(30 15% 70%);
 }
+
+/* ===== Daily Standup Walk Animation ===== */
+@keyframes standup-walk {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
+}
+
+.animate-standup-walk {
+  animation: standup-walk 0.4s ease-in-out infinite;
+}

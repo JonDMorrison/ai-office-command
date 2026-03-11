@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { agents } from '@/data/agents';
 
 export type DynamicState = 'typing' | 'reading' | 'idle' | 'waiting';
@@ -9,6 +9,7 @@ export interface AgentDynamicState {
   taskIndex: number;
   bobOffset: number;
   blinkOn: boolean;
+  standupOverride?: string; // e.g. "Working on it..."
 }
 
 const STATES: DynamicState[] = ['typing', 'reading', 'idle', 'waiting'];
@@ -32,7 +33,6 @@ export function useAgentStates() {
     const intervals: ReturnType<typeof setInterval>[] = [];
 
     agents.forEach(agent => {
-      // State cycling
       const stateInterval = setInterval(() => {
         const newState = STATES[Math.floor(Math.random() * STATES.length)];
         setStates(prev => ({
@@ -47,7 +47,6 @@ export function useAgentStates() {
         }));
       }, 2500 + Math.random() * 2000);
 
-      // Bob animation
       const bobInterval = setInterval(() => {
         setStates(prev => ({
           ...prev,
@@ -58,7 +57,6 @@ export function useAgentStates() {
         }));
       }, 600 + Math.random() * 400);
 
-      // Blink
       const blinkInterval = setInterval(() => {
         setStates(prev => ({
           ...prev,
@@ -75,8 +73,32 @@ export function useAgentStates() {
     return () => intervals.forEach(clearInterval);
   }, []);
 
+  const setStandupOverrides = useCallback((approvedIds: string[]) => {
+    setStates(prev => {
+      const next = { ...prev };
+      approvedIds.forEach(id => {
+        if (next[id]) {
+          next[id] = { ...next[id], state: 'typing', standupOverride: 'Working on it...' };
+        }
+      });
+      return next;
+    });
+    // Clear overrides after 15 seconds
+    setTimeout(() => {
+      setStates(prev => {
+        const next = { ...prev };
+        approvedIds.forEach(id => {
+          if (next[id]) {
+            next[id] = { ...next[id], standupOverride: undefined };
+          }
+        });
+        return next;
+      });
+    }, 15000);
+  }, []);
+
   const activeCount = Object.values(states).filter(s => s.state === 'typing' || s.state === 'reading').length;
   const waitingCount = Object.values(states).filter(s => s.state === 'waiting').length;
 
-  return { states, activeCount, waitingCount };
+  return { states, activeCount, waitingCount, setStandupOverrides };
 }
