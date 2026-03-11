@@ -211,7 +211,7 @@ serve(async (req) => {
         try {
           const accessToken = agentId === "bloomsuite"
             ? await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "")
-            : await getGmailAccessToken();
+            : await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN") || "");
           await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
           console.log(`Saved ${drafts.length} Gmail draft(s) for ${agentId}`);
         } catch (e) {
