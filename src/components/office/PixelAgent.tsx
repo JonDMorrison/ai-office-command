@@ -1,128 +1,177 @@
 import { Agent } from '@/data/agents';
-import { useEffect, useState } from 'react';
+import { AgentDynamicState } from '@/hooks/useAgentStates';
 
 interface PixelAgentProps {
   agent: Agent;
   onClick: () => void;
   isSelected: boolean;
+  dynamicState: AgentDynamicState;
 }
 
-const PixelAgent = ({ agent, onClick, isSelected }: PixelAgentProps) => {
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [showBubble, setShowBubble] = useState(true);
+const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProps) => {
+  const { state, taskIndex, bobOffset, blinkOn } = dynamicState;
+  const isTyping = state === 'typing';
+  const isWaiting = state === 'waiting';
+  const isReading = state === 'reading';
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setShowBubble(false);
-      setTimeout(() => {
-        setCurrentTaskIndex(prev => (prev + 1) % agent.tasks.length);
-        setShowBubble(true);
-      }, 300);
-    }, 8000 + Math.random() * 4000);
-    return () => clearInterval(interval);
-  }, [agent.tasks.length]);
-
-  const isActive = agent.status === 'active';
-  const isWaiting = agent.status === 'waiting';
+  const statusColor = isTyping ? agent.colorHex
+    : isWaiting ? '#fbbf24'
+    : isReading ? '#7dd3fc'
+    : '#334155';
 
   return (
     <div
       className={`relative flex flex-col items-center cursor-pointer transition-transform duration-200 ${isSelected ? 'scale-105' : 'hover:scale-105'}`}
       onClick={onClick}
+      style={{ transform: `translateY(${bobOffset}px)` }}
     >
       {/* Speech bubble */}
-      {showBubble && (
+      {(isTyping || isWaiting) && (
         <div
           className="animate-bubble-appear absolute -top-16 left-1/2 -translate-x-1/2 w-48 px-3 py-2 rounded border text-[9px] font-pixel leading-relaxed z-10"
           style={{
-            backgroundColor: `${agent.colorHex}10`,
-            borderColor: `${agent.colorHex}40`,
-            color: agent.colorHex,
+            backgroundColor: isWaiting ? '#fef3c710' : `${agent.colorHex}10`,
+            borderColor: isWaiting ? '#f59e0b40' : `${agent.colorHex}40`,
+            color: isWaiting ? '#f59e0b' : agent.colorHex,
           }}
         >
-          {agent.tasks[currentTaskIndex]}
+          {isWaiting ? '⚠ Needs your input' : agent.tasks[taskIndex]}
           <div
             className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0"
             style={{
               borderLeft: '6px solid transparent',
               borderRight: '6px solid transparent',
-              borderTop: `6px solid ${agent.colorHex}40`,
+              borderTop: `6px solid ${isWaiting ? '#f59e0b40' : `${agent.colorHex}40`}`,
             }}
           />
         </div>
       )}
 
       {/* Agent body */}
-      <div className={`relative ${isActive ? 'animate-agent-bob' : ''}`}>
-        {/* Head */}
+      <div className="relative">
+        {/* Head with avatar */}
         <div
-          className="w-10 h-10 rounded-sm border-2 relative animate-agent-blink"
+          className="w-10 h-10 rounded-sm border-2 relative flex items-center justify-center"
           style={{
-            backgroundColor: `${agent.colorHex}30`,
+            background: `linear-gradient(135deg, ${agent.colorHex}40, ${agent.colorHex}15)`,
             borderColor: agent.colorHex,
             boxShadow: `0 0 12px ${agent.colorHex}40`,
           }}
         >
+          <span className="text-sm z-10">{agent.avatar}</span>
           {/* Eyes */}
-          <div className="absolute top-3 left-2 flex gap-2">
-            <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: agent.colorHex }} />
-            <div className="w-1.5 h-1.5 rounded-sm" style={{ backgroundColor: agent.colorHex }} />
+          <div className="absolute bottom-1.5 left-1.5 flex gap-2">
+            <div
+              className="w-1.5 rounded-sm transition-all duration-100"
+              style={{
+                backgroundColor: '#0f172a',
+                height: blinkOn ? '6px' : '1px',
+              }}
+            />
+            <div
+              className="w-1.5 rounded-sm transition-all duration-100"
+              style={{
+                backgroundColor: '#0f172a',
+                height: blinkOn ? '6px' : '1px',
+              }}
+            />
           </div>
         </div>
 
         {/* Body */}
         <div
-          className={`w-10 h-8 mt-0.5 rounded-sm border-2 ${isActive ? 'animate-agent-type' : ''}`}
+          className="w-10 h-6 mt-0.5 rounded-sm border-2"
           style={{
-            backgroundColor: `${agent.colorHex}20`,
+            background: `linear-gradient(180deg, ${agent.colorHex}30, ${agent.colorHex}15)`,
             borderColor: `${agent.colorHex}80`,
           }}
         />
 
+        {/* Arms */}
+        <div
+          className="absolute top-[26px] -left-1.5 w-2.5 h-3.5 rounded-sm border transition-transform duration-150"
+          style={{
+            backgroundColor: `${agent.colorHex}30`,
+            borderColor: `${agent.colorHex}60`,
+            transformOrigin: 'top center',
+            transform: isTyping ? `rotate(${bobOffset === -3 ? -15 : 15}deg)` : 'rotate(0deg)',
+          }}
+        />
+        <div
+          className="absolute top-[26px] -right-1.5 w-2.5 h-3.5 rounded-sm border transition-transform duration-150"
+          style={{
+            backgroundColor: `${agent.colorHex}30`,
+            borderColor: `${agent.colorHex}60`,
+            transformOrigin: 'top center',
+            transform: isTyping ? `rotate(${bobOffset === -3 ? 15 : -15}deg)` : 'rotate(0deg)',
+          }}
+        />
+
+        {/* Legs */}
+        <div className="flex justify-center gap-1 -mt-0.5">
+          <div className="w-2.5 h-2.5 rounded-b-sm" style={{ backgroundColor: `${agent.colorHex}25` }} />
+          <div className="w-2.5 h-2.5 rounded-b-sm" style={{ backgroundColor: `${agent.colorHex}25` }} />
+        </div>
+
         {/* Status indicator */}
         <div className="absolute -top-1 -right-1 flex items-center gap-1">
           <div
-            className={`w-2.5 h-2.5 rounded-full border ${isActive ? 'animate-status-pulse' : ''}`}
+            className={`w-2.5 h-2.5 rounded-full border ${(isTyping || isReading) ? 'animate-status-pulse' : ''}`}
             style={{
-              backgroundColor: isActive ? agent.colorHex : isWaiting ? '#f59e0b' : '#6b7280',
-              borderColor: isActive ? agent.colorHex : isWaiting ? '#f59e0b80' : '#6b728080',
+              backgroundColor: statusColor,
+              borderColor: `${statusColor}80`,
             }}
           />
         </div>
       </div>
 
-      {/* Desk */}
+      {/* Desk — wooden style */}
       <div
-        className="w-20 h-3 mt-1 rounded-sm border"
+        className="w-20 h-3 mt-1 rounded-t-sm border"
         style={{
-          backgroundColor: `${agent.colorHex}10`,
-          borderColor: `${agent.colorHex}30`,
+          background: 'linear-gradient(180deg, hsl(30 60% 30%), hsl(30 50% 22%))',
+          borderColor: 'hsl(30 50% 35%)',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.4)',
         }}
       />
 
       {/* Monitor on desk */}
       <div className="relative -mt-10 mb-7">
         <div
-          className="w-14 h-10 rounded-sm border-2 flex items-center justify-center animate-monitor-glow"
+          className="w-14 h-10 rounded-sm border-2 flex items-center justify-center overflow-hidden transition-all duration-300"
           style={{
-            backgroundColor: `${agent.colorHex}08`,
-            borderColor: `${agent.colorHex}60`,
-            boxShadow: `0 0 20px ${agent.colorHex}20`,
+            backgroundColor: '#1e293b',
+            borderColor: isTyping ? agent.colorHex : `${agent.colorHex}40`,
+            boxShadow: isTyping ? `0 0 12px ${agent.colorHex}40` : 'none',
           }}
         >
-          {/* Screen content - scrolling text effect */}
-          <div className="w-10 space-y-0.5 overflow-hidden">
-            {[...Array(4)].map((_, i) => (
-              <div
-                key={i}
-                className="h-0.5 rounded-full opacity-60"
-                style={{
-                  backgroundColor: agent.colorHex,
-                  width: `${40 + Math.random() * 60}%`,
-                }}
-              />
-            ))}
-          </div>
+          {/* Screen content based on state */}
+          {isTyping && (
+            <div className="w-10 space-y-0.5 overflow-hidden p-0.5">
+              {[...Array(3)].map((_, i) => (
+                <div
+                  key={i}
+                  className="h-0.5 rounded-full opacity-70"
+                  style={{
+                    backgroundColor: agent.colorHex,
+                    width: `${40 + Math.random() * 60}%`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {isReading && (
+            <span className="text-[10px] opacity-90">📄</span>
+          )}
+          {(state === 'idle' || isWaiting) && (
+            <div
+              className="w-1.5 h-1.5 rounded-full transition-opacity duration-300"
+              style={{
+                backgroundColor: isWaiting ? '#fbbf24' : '#334155',
+                opacity: blinkOn ? 1 : 0.3,
+              }}
+            />
+          )}
         </div>
         {/* Monitor stand */}
         <div
@@ -140,14 +189,14 @@ const PixelAgent = ({ agent, onClick, isSelected }: PixelAgentProps) => {
           {agent.role}
         </div>
         <div
-          className="text-[8px] mt-1 px-2 py-0.5 rounded border font-pixel"
+          className="text-[8px] mt-1 px-2 py-0.5 rounded border font-pixel uppercase"
           style={{
-            color: isActive ? agent.colorHex : isWaiting ? '#f59e0b' : '#6b7280',
-            borderColor: isActive ? `${agent.colorHex}40` : isWaiting ? '#f59e0b40' : '#6b728040',
-            backgroundColor: isActive ? `${agent.colorHex}10` : isWaiting ? '#f59e0b10' : '#6b728010',
+            color: statusColor,
+            borderColor: `${statusColor}40`,
+            backgroundColor: `${statusColor}10`,
           }}
         >
-          {agent.status.toUpperCase()}
+          {state}
         </div>
       </div>
 
