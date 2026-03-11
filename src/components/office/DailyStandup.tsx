@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { agents } from '@/data/agents';
-import { Check, SkipForward } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { Check, SkipForward, Loader2 } from 'lucide-react';
 
 type StandupPhase = 'idle' | 'walking-in' | 'presenting' | 'approving' | 'walking-out' | 'complete';
 
-const SUGGESTIONS: Record<string, string> = {
+const FALLBACK_SUGGESTIONS: Record<string, string> = {
   bloomsuite: "Spring is coming — time to launch the seasonal campaign. Want me to draft the email series?",
   clinicleader: "You haven't posted about ClinicLeader in 3 weeks. Want me to draft a LinkedIn post?",
   projectpath: "ProjectPath has 2 features half-built. Want me to write a prioritization summary?",
@@ -12,7 +13,6 @@ const SUGGESTIONS: Record<string, string> = {
   inbox: "You have unread emails across both accounts. Want me to triage and draft replies?",
 };
 
-// Semicircle positions around center (relative to center point, in px)
 const MEETING_POSITIONS = [
   { x: -120, y: -40 },
   { x: -60,  y: -70 },
@@ -29,19 +29,62 @@ interface DailyStandupProps {
 const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
   const [phase, setPhase] = useState<StandupPhase>('idle');
   const [presentingIndex, setPresentingIndex] = useState(0);
+  const [suggestions, setSuggestions] = useState<Record<string, string>>(FALLBACK_SUGGESTIONS);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsReady, setSuggestionsReady] = useState(false);
+  const fetchedRef = useRef(false);
   const [decisions, setDecisions] = useState<Record<string, 'approved' | 'skipped' | null>>(() => {
     const d: Record<string, 'approved' | 'skipped' | null> = {};
     agents.forEach(a => { d[a.id] = null; });
     return d;
   });
 
-  // Walking-in → presenting
+  // Fetch suggestions when standup starts (walking-in phase)
   useEffect(() => {
-    if (phase === 'walking-in') {
-      const t = setTimeout(() => setPhase('presenting'), 2000);
-      return () => clearTimeout(t);
+    if (phase === 'walking-in' && !fetchedRef.current) {
+      fetchedRef.current = true;
+      setSuggestionsLoading(true);
+
+      supabase.functions.invoke('daily-standup', { body: {} })
+        .then(({ data, error }) => {
+          if (error) {
+            console.error('Standup fetch error:', error);
+            setSuggestionsReady(true);
+            return;
+          }
+          if (data?.suggestions) {
+            setSuggestions(prev => ({ ...prev, ...data.suggestions }));
+          }
+          setSuggestionsReady(true);
+        })
+        .catch(err => {
+          console.error('Standup fetch failed:', err);
+          setSuggestionsReady(true);
+        })
+        .finally(() => setSuggestionsLoading(false));
     }
   }, [phase]);
+
+  // Walking-in → presenting (wait for suggestions to be ready)
+  useEffect(() => {
+    if (phase === 'walking-in') {
+      // Minimum 2s walk + wait for suggestions
+      const minWalkTimer = setTimeout(() => {
+        if (suggestionsReady) {
+          setPhase('presenting');
+        }
+      }, 2000);
+      return () => clearTimeout(minWalkTimer);
+    }
+  }, [phase, suggestionsReady]);
+
+  // If suggestions arrive after 2s walk timer already fired
+  useEffect(() => {
+    if (phase === 'walking-in' && suggestionsReady) {
+      const t = setTimeout(() => setPhase('presenting'), 500);
+      return () => clearTimeout(t);
+    }
+  }, [phase, suggestionsReady]);
 
   // Presenting auto-advance
   useEffect(() => {
@@ -112,16 +155,9 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
       {/* Agents walking to meeting zone */}
       <div className="absolute left-1/2 top-[55%] -translate-x-1/2 -translate-y-1/2">
         {agents.map((agent, i) => {
-          const isWalkingIn = phase === 'walking-in';
           const isPresenting = phase === 'presenting' && presentingIndex === i;
           const hasPresented = phase === 'presenting' && presentingIndex > i;
-          const isApproving = phase === 'approving';
-          const isWalkingOut = phase === 'walking-out';
-          const isComplete = phase === 'complete';
-          const decision = decisions[agent.id];
           const pos = MEETING_POSITIONS[i];
-
-          const inPosition = !isWalkingIn || false;
 
           return (
             <div
@@ -142,9 +178,7 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
             >
               {/* Walking animation wrapper */}
               <div className={`${(phase === 'walking-in' || phase === 'walking-out') ? 'animate-standup-walk' : 'iso-character'}`}>
-                {/* Simple character */}
                 <div className="flex flex-col items-center" style={{ transform: 'scale(2)' }}>
-                  {/* Head */}
                   <div
                     className="w-[12px] h-[12px] rounded-full relative"
                     style={{ backgroundColor: '#f0c8a0' }}
@@ -152,12 +186,10 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                     <div className="absolute top-[4px] left-[3px] w-[2px] h-[2px] rounded-full bg-[#1a1a1a]" />
                     <div className="absolute top-[4px] right-[3px] w-[2px] h-[2px] rounded-full bg-[#1a1a1a]" />
                   </div>
-                  {/* Body */}
                   <div
                     className="w-[14px] h-[12px] rounded-sm mt-[1px]"
                     style={{ backgroundColor: agent.colorHex }}
                   />
-                  {/* Legs */}
                   <div className="flex gap-[2px]">
                     <div className="w-[4px] h-[8px] rounded-b-sm bg-[#374151]" />
                     <div className="w-[4px] h-[8px] rounded-b-sm bg-[#374151]" />
@@ -165,7 +197,6 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                 </div>
               </div>
 
-              {/* Agent label */}
               <div
                 className="text-[10px] font-semibold text-center mt-1 whitespace-nowrap"
                 style={{ color: agent.colorHex }}
@@ -173,22 +204,19 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                 {agent.name}
               </div>
 
-              {/* Presenting card — single agent spotlight */}
+              {/* Presenting card */}
               {isPresenting && (
-                <div
-                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[220px] animate-bubble-appear"
-                >
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[260px] animate-bubble-appear">
                   <div
                     className="bg-white rounded-lg p-3 shadow-xl text-[13px] leading-relaxed text-[#1a1a1a]"
                     style={{ borderLeft: `4px solid ${agent.colorHex}` }}
                   >
-                    {SUGGESTIONS[agent.id]}
+                    {suggestions[agent.id]}
                   </div>
                 </div>
               )}
 
-              {/* Presented checkmark */}
-              {hasPresented && !isApproving && (
+              {hasPresented && phase === 'presenting' && (
                 <div className="absolute -top-2 left-1/2 -translate-x-1/2 text-muted-foreground text-xs">✓</div>
               )}
             </div>
@@ -196,10 +224,10 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
         })}
       </div>
 
-      {/* Approval cards — shown during approving phase */}
+      {/* Approval cards */}
       {phase === 'approving' && (
-        <div className="absolute inset-x-0 top-4 bottom-20 flex items-center justify-center pointer-events-auto">
-          <div className="flex flex-wrap justify-center gap-3 max-w-[700px] px-4">
+        <div className="absolute inset-x-0 top-4 bottom-20 flex items-center justify-center pointer-events-auto overflow-y-auto">
+          <div className="flex flex-wrap justify-center gap-3 max-w-[700px] px-4 py-4">
             {agents.map(agent => {
               const decision = decisions[agent.id];
               return (
@@ -211,16 +239,13 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                   style={{ borderLeft: `4px solid ${agent.colorHex}` }}
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <div
-                      className="w-3 h-3 rounded-full"
-                      style={{ backgroundColor: agent.colorHex }}
-                    />
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: agent.colorHex }} />
                     <span className="text-sm font-semibold" style={{ color: agent.colorHex }}>
                       {agent.name}
                     </span>
                   </div>
                   <p className="text-[14px] leading-relaxed text-[#1a1a1a] mb-3">
-                    {SUGGESTIONS[agent.id]}
+                    {suggestions[agent.id]}
                   </p>
                   {decision ? (
                     <div className={`text-sm font-medium ${decision === 'approved' ? 'text-green-600' : 'text-gray-400'}`}>
@@ -248,7 +273,6 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
               );
             })}
 
-            {/* Submit button */}
             {allDecided && (
               <div className="w-full flex justify-center mt-2">
                 <button
@@ -286,8 +310,13 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
 
       {/* Phase indicator */}
       {(phase === 'walking-in' || phase === 'presenting' || phase === 'walking-out') && (
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-card border border-border shadow-md text-xs font-medium text-foreground">
-          {phase === 'walking-in' && '☕ Team is gathering...'}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-card border border-border shadow-md text-xs font-medium text-foreground flex items-center gap-2">
+          {phase === 'walking-in' && (
+            <>
+              <Loader2 size={12} className="animate-spin" />
+              {suggestionsLoading ? '☕ Gathering context from Gmail & agents...' : '☕ Team is gathering...'}
+            </>
+          )}
           {phase === 'presenting' && `📋 ${agents[presentingIndex]?.name || 'Team'} is presenting...`}
           {phase === 'walking-out' && '🚶 Heading back to work...'}
         </div>
