@@ -183,6 +183,20 @@ serve(async (req) => {
     const data = await response.json();
     const text = data.content?.[0]?.text || "No response generated.";
 
+    // For inbox agent, parse and save any draft blocks
+    if (agentId === "inbox") {
+      const drafts = parseDraftBlocks(text);
+      if (drafts.length > 0) {
+        try {
+          const accessToken = await getGmailAccessToken();
+          await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
+          console.log(`Saved ${drafts.length} Gmail draft(s)`);
+        } catch (e) {
+          console.error("Failed to save Gmail drafts:", e);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({ text }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
