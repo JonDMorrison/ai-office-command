@@ -145,10 +145,11 @@ serve(async (req) => {
         const accessToken = await getGmailAccessToken(bloomsuiteRefreshToken);
         const inboxSummary = await fetchInboxSummary(accessToken);
         console.log("BloomSuite agent: fetched inbox summary, length:", inboxSummary.length);
+        const draftInstructions = `\n\n## Drafting Emails\nWhen the user asks you to draft, reply to, or compose an email for the jon@brandsinblooms.com account, format the draft using EXACTLY this structure so it gets automatically saved to Gmail Drafts:\n\n[DRAFT]\nTo: recipient@example.com\nSubject: Re: Subject line\nBody: The full email body text here\n[/DRAFT]\n\nYou can include multiple [DRAFT]...[/DRAFT] blocks if needed. The draft will be saved automatically — confirm to the user that the draft has been saved to Gmail.\n`;
         const inboxContext = inboxSummary.length > 0
-          ? "## BloomSuite Inbox (unread)\n\n" + inboxSummary
+          ? "## BloomSuite Inbox (unread)\nYou have LIVE access to Jon's jon@brandsinblooms.com inbox. The following are REAL unread emails fetched just now.\n\n" + inboxSummary
           : "## BloomSuite Inbox\n\nNo unread emails for jon@brandsinblooms.com.";
-        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
+        systemPrompt = inboxContext + draftInstructions + "\n\n---\n\n" + systemPrompt;
       } catch (e) {
         console.error("Failed to fetch BloomSuite inbox:", e);
         systemPrompt = "## BloomSuite Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
