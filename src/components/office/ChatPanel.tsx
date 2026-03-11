@@ -39,12 +39,6 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
     setIsTyping(true);
 
     try {
-      // Fetch skills for this agent
-      const { data: skills } = await supabase
-        .from('agent_skills')
-        .select('skill_name, skill_description')
-        .eq('agent_id', agent.id);
-
       // Build conversation history (exclude the initial greeting)
       const conversationMessages = messages
         .slice(1)
