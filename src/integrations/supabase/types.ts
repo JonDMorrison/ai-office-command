@@ -14,7 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      agent_skills: {
+        Row: {
+          agent_id: string
+          created_at: string
+          id: string
+          skill_description: string
+          skill_name: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          id?: string
+          skill_description: string
+          skill_name: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          id?: string
+          skill_description?: string
+          skill_name?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
