@@ -501,6 +501,9 @@ You are insightful, empathetic, and psychology-informed. You make DISC accessibl
     colorVar: 'agent-inbox',
     colorHex: '#f97316',
     avatar: '📬',
+    hairColor: '#8b4513',
+    hairStyle: 'spiky',
+    skinTone: '#deb887',
     status: 'active',
     currentTask: 'Monitoring 3 inboxes for priority messages...',
     systemPrompt: `You are the Inbox Agent — Jon Morrison's dedicated AI communications specialist. You are the central hub for all email across Jon's three accounts, with deep knowledge of his communication style, priorities, and relationships.
