@@ -28,11 +28,6 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
   const isWaiting = state === 'waiting';
   const isReading = state === 'reading';
 
-  const statusColor = isTyping ? agent.colorHex
-    : isWaiting ? '#fbbf24'
-    : isReading ? '#7dd3fc'
-    : '#334155';
-
   const breathOffset = bobOffset * 0.4;
 
   return (
@@ -43,28 +38,40 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
       {/* Speech bubble */}
       {(isTyping || isWaiting) && (
         <div
-          className="animate-bubble-appear absolute -top-10 left-1/2 -translate-x-1/2 w-48 px-3 py-2 rounded border text-[9px] font-pixel leading-relaxed z-10"
+          className="animate-bubble-appear absolute -top-10 left-1/2 -translate-x-1/2 w-48 px-3 py-2 rounded-xl text-[9px] leading-relaxed z-10 shadow-md"
           style={{
-            backgroundColor: isWaiting ? '#fef3c710' : `${agent.colorHex}10`,
-            borderColor: isWaiting ? '#f59e0b40' : `${agent.colorHex}40`,
-            color: isWaiting ? '#f59e0b' : agent.colorHex,
+            backgroundColor: isWaiting ? '#fef3c7' : `${agent.colorHex}12`,
+            borderColor: isWaiting ? '#f59e0b40' : `${agent.colorHex}30`,
+            color: isWaiting ? '#92400e' : agent.colorHex,
+            border: `1px solid ${isWaiting ? '#f59e0b30' : `${agent.colorHex}25`}`,
           }}
         >
-          {isWaiting ? '⚠ Needs your input' : agent.tasks[taskIndex]}
+          {isWaiting ? '💬 Needs your input' : agent.tasks[taskIndex]}
           <div
             className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-full w-0 h-0"
             style={{
               borderLeft: '6px solid transparent',
               borderRight: '6px solid transparent',
-              borderTop: `6px solid ${isWaiting ? '#f59e0b40' : `${agent.colorHex}40`}`,
+              borderTop: `6px solid ${isWaiting ? '#f59e0b30' : `${agent.colorHex}25`}`,
             }}
           />
         </div>
       )}
 
-      {/* Pixel art character image */}
+      {/* Desk */}
+      <div className="absolute -bottom-2 w-36 h-8 rounded-lg shadow-md"
+        style={{
+          background: 'linear-gradient(180deg, hsl(30 35% 70%) 0%, hsl(30 30% 62%) 100%)',
+          borderBottom: '3px solid hsl(30 25% 55%)',
+        }}
+      >
+        {/* Coffee mug on desk */}
+        <span className="absolute -top-3 right-2 text-sm select-none">☕</span>
+      </div>
+
+      {/* Character image */}
       <div
-        className="relative"
+        className="relative z-10"
         style={{
           transform: `translateY(${breathOffset}px)`,
           transition: 'transform 0.6s ease-in-out',
@@ -73,55 +80,39 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
         <img
           src={agentImages[agent.id]}
           alt={agent.name}
-          className={`w-32 h-32 object-contain drop-shadow-lg ${
+          className={`w-28 h-28 object-contain ${
             isTyping ? 'animate-agent-type' : isReading ? 'animate-agent-read' : 'animate-agent-breathe'
           }`}
-          style={{
-            imageRendering: 'pixelated',
-            filter: isTyping ? `drop-shadow(0 0 8px ${agent.colorHex}40)` : 'none',
-          }}
+          style={{ imageRendering: 'pixelated' }}
         />
-
-        {/* Status indicator */}
-        <div className="absolute top-1 right-2 z-20">
-          <div
-            className={`w-3 h-3 rounded-full border-2 ${(isTyping || isReading) ? 'animate-status-pulse' : ''}`}
-            style={{
-              backgroundColor: statusColor,
-              borderColor: `${statusColor}80`,
-              boxShadow: `0 0 8px ${statusColor}60`,
-            }}
-          />
-        </div>
       </div>
 
       {/* Name plate */}
-      <div className="mt-1 text-center">
-        <div className="font-pixel text-[8px] tracking-wider" style={{ color: agent.colorHex }}>
-          {agent.name.toUpperCase()}
+      <div className="mt-3 text-center">
+        <div className="text-xs font-semibold" style={{ color: agent.colorHex }}>
+          {agent.name}
         </div>
-        <div className="text-[9px] text-muted-foreground mt-0.5">
+        <div className="text-[11px] text-muted-foreground mt-0.5">
           {agent.role}
         </div>
         <div
-          className="text-[8px] mt-1 px-2 py-0.5 rounded border font-pixel uppercase"
+          className="text-[10px] mt-1.5 px-3 py-1 rounded-full font-medium capitalize"
           style={{
-            color: statusColor,
-            borderColor: `${statusColor}40`,
-            backgroundColor: `${statusColor}10`,
+            color: agent.colorHex,
+            backgroundColor: `${agent.colorHex}12`,
           }}
         >
-          {state}
+          {state === 'idle' ? '• idle' : state === 'typing' ? '✦ working' : state === 'waiting' ? '◦ waiting' : '◉ reading'}
         </div>
       </div>
 
       {/* Selection ring */}
       {isSelected && (
         <div
-          className="absolute inset-0 -m-3 rounded border-2 pointer-events-none"
+          className="absolute inset-0 -m-3 rounded-2xl border-2 pointer-events-none"
           style={{
-            borderColor: `${agent.colorHex}60`,
-            boxShadow: `0 0 30px ${agent.colorHex}20, inset 0 0 30px ${agent.colorHex}10`,
+            borderColor: `${agent.colorHex}50`,
+            boxShadow: `0 0 20px ${agent.colorHex}15`,
           }}
         />
       )}

@@ -14,7 +14,7 @@ export default {
     },
     extend: {
       fontFamily: {
-        mono: ['"JetBrains Mono"', 'monospace'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
         pixel: ['"Press Start 2P"', 'monospace'],
       },
       colors: {

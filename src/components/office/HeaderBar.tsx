@@ -13,39 +13,36 @@ const HeaderBar = ({ activeCount, waitingCount }: HeaderBarProps) => {
     return () => clearInterval(interval);
   }, []);
 
-  const formatTime = (d: Date) => {
-    return d.toLocaleTimeString('en-US', { hour12: false });
-  };
+  const formatTime = (d: Date) =>
+    d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-  const formatDate = (d: Date) => {
-    return d.toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' });
-  };
+  const formatDate = (d: Date) =>
+    d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-border bg-card/80 backdrop-blur-sm">
+    <header className="flex items-center justify-between px-6 py-3 bg-card border-b border-border shadow-sm">
       <div className="flex items-center gap-3">
-        <span className="text-xl">🏢</span>
+        <span className="text-2xl">☀️</span>
         <div>
-          <span className="font-pixel text-[10px] text-primary tracking-wider">
-            JONCOACH OFFICE
+          <span className="font-semibold text-sm text-foreground tracking-wide">
+            JonCoach Office
           </span>
-          <div className="text-muted-foreground text-[9px]">AUTONOMOUS AGENT SYSTEM v2.1.0</div>
+          <div className="text-muted-foreground text-xs">Your AI team, ready to help</div>
         </div>
       </div>
 
-      <div className="flex items-center gap-6 text-xs">
+      <div className="flex items-center gap-6 text-sm">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-agent-bloom animate-status-pulse" />
-          <span className="text-foreground">{activeCount} ACTIVE</span>
+          <span className="text-foreground font-medium">{activeCount} active</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: '#fbbf24' }} />
-          <span className="text-muted-foreground">{waitingCount} WAITING</span>
+          <div className="w-2 h-2 rounded-full bg-agent-project" />
+          <span className="text-muted-foreground">{waitingCount} waiting</span>
         </div>
-        <div className="border-l border-border pl-4 flex items-center gap-2">
-          <span className="text-muted-foreground">{formatDate(time)}</span>
-          <span className="text-primary font-semibold">{formatTime(time)}</span>
-          <span className="animate-cursor-blink text-primary">_</span>
+        <div className="border-l border-border pl-4 flex items-center gap-2 text-muted-foreground">
+          <span>{formatDate(time)}</span>
+          <span className="text-foreground font-medium">{formatTime(time)}</span>
         </div>
       </div>
     </header>
