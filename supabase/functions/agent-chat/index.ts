@@ -64,19 +64,40 @@ serve(async (req) => {
 
     const systemPrompt = skillContents.join("\n\n---\n\n");
 
+    // MCP servers — Inbox agent gets Gmail access
+    const mcpServers = agentId === 'inbox' ? [
+      {
+        type: "url",
+        url: "https://gmail.mcp.claude.com/mcp",
+        name: "gmail",
+      },
+    ] : [];
+
+    const headers: Record<string, string> = {
+      "x-api-key": ANTHROPIC_API_KEY,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    };
+
+    if (mcpServers.length > 0) {
+      headers["anthropic-beta"] = "mcp-client-2025-04-04";
+    }
+
+    const requestBody: Record<string, unknown> = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages,
+    };
+
+    if (mcpServers.length > 0) {
+      requestBody.mcp_servers = mcpServers;
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages,
-      }),
+      headers,
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
