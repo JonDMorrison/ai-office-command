@@ -7,6 +7,7 @@ export interface Agent {
   product: string;
   colorVar: string;
   colorHex: string;
+  avatar: string;
   status: AgentStatus;
   currentTask: string;
   systemPrompt: string;
