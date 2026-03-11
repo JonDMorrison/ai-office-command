@@ -11,7 +11,7 @@ const agentImages: Record<string, string> = {
   bloomsuite: bloomsuiteImg,
   clinicleader: clinicleaderImg,
   projectpath: projectpathImg,
-  disc: discImg,
+  discprofile: discImg,
   inbox: inboxImg,
 };
 
