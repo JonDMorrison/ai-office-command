@@ -27,7 +27,7 @@ interface DailyStandupProps {
 }
 
 const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
-  const [phase, setPhase] = useState<StandupPhase>('idle');
+  const [phase, setPhase] = useState<StandupPhase>('walking-in');
   const [presentingIndex, setPresentingIndex] = useState(0);
   const [suggestions, setSuggestions] = useState<Record<string, string>>(FALLBACK_SUGGESTIONS);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
