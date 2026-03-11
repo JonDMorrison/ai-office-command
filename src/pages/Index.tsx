@@ -11,7 +11,7 @@ import DailyStandup from '@/components/office/DailyStandup';
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showSkills, setShowSkills] = useState(false);
-  const [standupActive, setStandupActive] = useState(true); // show idle button by default
+  const [standupActive, setStandupActive] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
 
