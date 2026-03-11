@@ -28,10 +28,9 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
-async function getGmailAccessToken(refreshTokenOverride?: string): Promise<string> {
+async function getGmailAccessToken(refreshToken: string): Promise<string> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
-  const refreshToken = refreshTokenOverride || Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
   
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -50,7 +49,7 @@ async function getGmailAccessToken(refreshTokenOverride?: string): Promise<strin
   return data.access_token;
 }
 
-async function fetchInboxSummary(accessToken: string): Promise<string> {
+async function fetchInboxSummary(accessToken: string, accountLabel?: string): Promise<string> {
   const listRes = await fetch(
     "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=is:unread",
     { headers: { Authorization: `Bearer ${accessToken}` } }
@@ -67,7 +66,8 @@ async function fetchInboxSummary(accessToken: string): Promise<string> {
     const subject = headers.find((h: any) => h.name === "Subject")?.value || "(no subject)";
     const from = headers.find((h: any) => h.name === "From")?.value || "unknown";
     const snippet = msgData.snippet || "";
-    return `From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
+    const acctPrefix = accountLabel ? `[${accountLabel}] ` : "";
+    return `${acctPrefix}From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
   }));
   return summaries.join("\n\n");
 }
@@ -156,22 +156,24 @@ serve(async (req) => {
       }
     }
 
-    // For inbox agent, prepend live Gmail context
+    // For inbox agent, fetch from both accounts in parallel
     if (agentId === "inbox") {
       try {
-        console.log("Inbox agent: fetching Gmail access token...");
-        const accessToken = await getGmailAccessToken();
-        console.log("Inbox agent: access token obtained:", accessToken ? "yes" : "NO TOKEN");
-        const inboxSummary = await fetchInboxSummary(accessToken);
-        console.log("Inbox agent: fetched inbox summary, length:", inboxSummary.length);
-        const draftInstructions = `\n\n## Drafting Emails\nWhen the user asks you to draft, reply to, or compose an email, format the draft using EXACTLY this structure so it gets automatically saved to Gmail Drafts:\n\n[DRAFT]\nTo: recipient@example.com\nSubject: Re: Subject line\nBody: The full email body text here\n[/DRAFT]\n\nYou can include multiple [DRAFT]...[/DRAFT] blocks if needed. The draft will be saved automatically — confirm to the user that the draft has been saved to Gmail.\n`;
-        const inboxContext = inboxSummary.length > 0
-          ? "## Current Inbox (unread)\nYou have LIVE access to Jon's inbox. The following are REAL unread emails fetched just now. Use this data to answer questions about the inbox. Do NOT tell the user you can't access their email — you already have it.\n\n" + inboxSummary
-          : "## Current Inbox\nYou have live Gmail access but there are currently no unread emails. Tell the user their inbox is clear.";
+        console.log("Inbox agent: fetching Gmail from both accounts...");
+        const [getclearInbox, bloomsuiteInbox] = await Promise.all([
+          fetchInboxSummary(await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN") || ""), "getclear.ca"),
+          fetchInboxSummary(await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || ""), "brandsinblooms.com"),
+        ]);
+        console.log("Inbox agent: getclear length:", getclearInbox.length, "bloomsuite length:", bloomsuiteInbox.length);
+        const combinedInbox = `### jon@getclear.ca\n\n${getclearInbox || "No unread emails."}\n\n### jon@brandsinblooms.com\n\n${bloomsuiteInbox || "No unread emails."}`;
+        const draftInstructions = `\n\n## Drafting Emails\nWhen the user asks you to draft, reply to, or compose an email, format the draft using EXACTLY this structure so it gets automatically saved to Gmail Drafts. IMPORTANT: Include an "Account:" line to specify which Gmail account to save the draft to (getclear.ca or brandsinblooms.com):\n\n[DRAFT]\nAccount: getclear.ca\nTo: recipient@example.com\nSubject: Re: Subject line\nBody: The full email body text here\n[/DRAFT]\n\nYou can include multiple [DRAFT]...[/DRAFT] blocks if needed. The draft will be saved automatically — confirm to the user that the draft has been saved to Gmail. Default to the account that received the original email when replying.\n`;
+        const inboxContext = (getclearInbox.length > 0 || bloomsuiteInbox.length > 0)
+          ? "## Full Inbox (both accounts)\nYou have LIVE access to Jon's inboxes for BOTH jon@getclear.ca and jon@brandsinblooms.com. The following are REAL unread emails fetched just now. Each email is labeled with its account. Do NOT tell the user you can't access their email — you already have it.\n\n" + combinedInbox
+          : "## Full Inbox\nYou have live Gmail access to both accounts but there are currently no unread emails. Tell the user their inbox is clear.";
         systemPrompt = inboxContext + draftInstructions + "\n\n---\n\n" + systemPrompt;
       } catch (e) {
         console.error("Failed to fetch Gmail inbox:", e);
-        systemPrompt = "## Current Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
+        systemPrompt = "## Full Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
       }
     }
 
@@ -209,7 +211,7 @@ serve(async (req) => {
         try {
           const accessToken = agentId === "bloomsuite"
             ? await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "")
-            : await getGmailAccessToken();
+            : await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN") || "");
           await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
           console.log(`Saved ${drafts.length} Gmail draft(s) for ${agentId}`);
         } catch (e) {
