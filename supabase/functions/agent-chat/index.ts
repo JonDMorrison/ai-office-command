@@ -28,10 +28,10 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
-async function getGmailAccessToken(): Promise<string> {
+async function getGmailAccessToken(refreshTokenOverride?: string): Promise<string> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
-  const refreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
+  const refreshToken = refreshTokenOverride || Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
   
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
@@ -136,6 +136,24 @@ serve(async (req) => {
     );
 
     let systemPrompt = skillContents.join("\n\n---\n\n");
+
+    // For bloomsuite agent, prepend BloomSuite inbox context
+    if (agentId === "bloomsuite") {
+      try {
+        console.log("BloomSuite agent: fetching Gmail access token for jon@brandsinblooms.com...");
+        const bloomsuiteRefreshToken = Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "";
+        const accessToken = await getGmailAccessToken(bloomsuiteRefreshToken);
+        const inboxSummary = await fetchInboxSummary(accessToken);
+        console.log("BloomSuite agent: fetched inbox summary, length:", inboxSummary.length);
+        const inboxContext = inboxSummary.length > 0
+          ? "## BloomSuite Inbox (unread)\n\n" + inboxSummary
+          : "## BloomSuite Inbox\n\nNo unread emails for jon@brandsinblooms.com.";
+        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
+      } catch (e) {
+        console.error("Failed to fetch BloomSuite inbox:", e);
+        systemPrompt = "## BloomSuite Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
+      }
+    }
 
     // For inbox agent, prepend live Gmail context
     if (agentId === "inbox") {
