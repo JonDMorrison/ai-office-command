@@ -72,6 +72,36 @@ async function fetchInboxSummary(accessToken: string): Promise<string> {
   return summaries.join("\n\n");
 }
 
+async function saveGmailDraft(accessToken: string, to: string, subject: string, body: string): Promise<void> {
+  const email = [`To: ${to}`, `Subject: ${subject}`, `Content-Type: text/plain; charset=utf-8`, ``, body].join("\n");
+  const encoded = btoa(unescape(encodeURIComponent(email))).replace(/\+/g, "-").replace(/\//g, "_");
+  const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/drafts", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ message: { raw: encoded } }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error("Failed to save Gmail draft:", res.status, err);
+  } else {
+    await res.text();
+    console.log(`Draft saved: To=${to}, Subject=${subject}`);
+  }
+}
+
+function parseDraftBlocks(text: string): Array<{ to: string; subject: string; body: string }> {
+  const drafts: Array<{ to: string; subject: string; body: string }> = [];
+  const regex = /\[DRAFT\]\s*\nTo:\s*(.+)\nSubject:\s*(.+)\nBody:\s*([\s\S]*?)\[\/DRAFT\]/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    drafts.push({ to: match[1].trim(), subject: match[2].trim(), body: match[3].trim() });
+  }
+  return drafts;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
