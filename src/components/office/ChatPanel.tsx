@@ -8,6 +8,7 @@ interface ChatPanelProps {
   agent: Agent;
   onClose: () => void;
   onOpenSkills: () => void;
+  initialNote?: string;
 }
 
 interface Message {
@@ -15,13 +16,23 @@ interface Message {
   content: string;
 }
 
-const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
+const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps) => {
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const initial: Message[] = [];
+    if (initialNote) {
+      initial.push({
+        role: 'user',
+        content: `Before starting, note Jon's refinement: ${initialNote}`,
+      });
+    }
+    initial.push({
       role: 'assistant',
-      content: `Hi! I'm ${agent.name}, your ${agent.role} specialist. How can I help you today?`,
-    },
-  ]);
+      content: initialNote
+        ? `Got it — I'll factor in that refinement. I'm ${agent.name}, your ${agent.role} specialist. Let's get started!`
+        : `Hi! I'm ${agent.name}, your ${agent.role} specialist. How can I help you today?`,
+    });
+    return initial;
+  });
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -40,7 +51,6 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
 
     try {
       const conversationMessages = messages
-        .slice(1)
         .map(m => ({ role: m.role, content: m.content }));
       conversationMessages.push({ role: 'user', content: userMessage });
 

@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
 import HeaderBar from '@/components/office/HeaderBar';
@@ -14,13 +14,15 @@ const Index = () => {
   const [standupActive, setStandupActive] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
+  const followUpNotes = useRef<Record<string, string>>({});
 
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
   };
 
-  const handleStandupApproved = useCallback((approvedIds: string[]) => {
+  const handleStandupApproved = useCallback((approvedIds: string[], followUps: Record<string, string>) => {
     setStandupOverrides(approvedIds);
+    followUpNotes.current = followUps;
   }, [setStandupOverrides]);
 
   const handleStandupDismiss = useCallback(() => {
@@ -97,6 +99,7 @@ const Index = () => {
             agent={selectedAgent}
             onClose={() => setSelectedAgentId(null)}
             onOpenSkills={() => setShowSkills(true)}
+            initialNote={followUpNotes.current[selectedAgent.id]}
           />
         )}
       </div>

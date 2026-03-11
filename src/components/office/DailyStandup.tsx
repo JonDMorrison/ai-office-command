@@ -22,7 +22,7 @@ const MEETING_POSITIONS = [
 ];
 
 interface DailyStandupProps {
-  onApproved: (agentIds: string[]) => void;
+  onApproved: (agentIds: string[], followUps: Record<string, string>) => void;
   onDismiss: () => void;
 }
 
@@ -33,6 +33,8 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsReady, setSuggestionsReady] = useState(false);
   const fetchedRef = useRef(false);
+  const [followUps, setFollowUps] = useState<Record<string, string>>({});
+  const [currentFollowUp, setCurrentFollowUp] = useState('');
   const [decisions, setDecisions] = useState<Record<string, 'approved' | 'skipped' | null>>(() => {
     const d: Record<string, 'approved' | 'skipped' | null> = {};
     agents.forEach(a => { d[a.id] = null; });
@@ -82,8 +84,6 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
     }
   }, [phase, suggestionsReady]);
 
-  // NO auto-advance for presenting — user clicks Next manually
-
   // Walking-out → complete
   useEffect(() => {
     if (phase === 'walking-out') {
@@ -91,12 +91,12 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
         const approvedIds = Object.entries(decisions)
           .filter(([, v]) => v === 'approved')
           .map(([k]) => k);
-        onApproved(approvedIds);
+        onApproved(approvedIds, followUps);
         setPhase('complete');
       }, 2000);
       return () => clearTimeout(t);
     }
-  }, [phase, decisions, onApproved]);
+  }, [phase, decisions, followUps, onApproved]);
 
   const handleDecision = useCallback((agentId: string, decision: 'approved' | 'skipped') => {
     setDecisions(prev => ({ ...prev, [agentId]: decision }));
@@ -111,12 +111,19 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
   const approvedCount = Object.values(decisions).filter(d => d === 'approved').length;
 
   const handleNextPresenting = useCallback(() => {
+    const currentAgent = agents[presentingIndex];
+    // Save follow-up if entered
+    if (currentFollowUp.trim()) {
+      setFollowUps(prev => ({ ...prev, [currentAgent.id]: currentFollowUp.trim() }));
+    }
+    setCurrentFollowUp('');
+
     if (presentingIndex < agents.length - 1) {
       setPresentingIndex(i => i + 1);
     } else {
       setPhase('approving');
     }
-  }, [presentingIndex]);
+  }, [presentingIndex, currentFollowUp]);
 
   const isLastAgent = presentingIndex >= agents.length - 1;
 
@@ -174,9 +181,9 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                   {agent.name}
                 </div>
 
-                {/* Presenting card */}
+                {/* Presenting card with follow-up input */}
                 {isPresenting && (
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[280px] animate-bubble-appear">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[300px] animate-bubble-appear">
                     <div
                       className="bg-white rounded-lg p-3 shadow-xl leading-relaxed text-[#1a1a1a]"
                       style={{ borderLeft: `4px solid ${agent.colorHex}`, fontSize: '13px', lineHeight: 1.5 }}
@@ -184,7 +191,25 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                       <div className="font-bold mb-1" style={{ fontSize: '15px', color: agent.colorHex }}>
                         {agent.name}
                       </div>
-                      {suggestions[agent.id]}
+                      <div className="mb-2">{suggestions[agent.id]}</div>
+                      <div>
+                        <label className="block mb-1" style={{ fontSize: '12px', color: '#6b7280' }}>
+                          Refine this task (optional)
+                        </label>
+                        <input
+                          type="text"
+                          value={currentFollowUp}
+                          onChange={e => setCurrentFollowUp(e.target.value)}
+                          placeholder="e.g. Focus on Instagram instead..."
+                          className="w-full bg-white outline-none"
+                          style={{
+                            border: '1px solid #e5e7eb',
+                            borderRadius: '6px',
+                            padding: '8px',
+                            fontSize: '13px',
+                          }}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -227,6 +252,7 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-[860px] mx-auto">
               {agents.map(agent => {
                 const decision = decisions[agent.id];
+                const agentFollowUp = followUps[agent.id];
                 return (
                   <div
                     key={agent.id}
@@ -241,9 +267,24 @@ const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
                         {agent.name}
                       </span>
                     </div>
-                    <p className="text-[#1a1a1a] mb-2.5" style={{ fontSize: '13px', lineHeight: 1.5 }}>
+                    <p className="text-[#1a1a1a] mb-1" style={{ fontSize: '13px', lineHeight: 1.5 }}>
                       {suggestions[agent.id]}
                     </p>
+                    {agentFollowUp && (
+                      <div
+                        className="rounded mb-2"
+                        style={{
+                          backgroundColor: '#f3f4f6',
+                          padding: '6px 10px',
+                          fontSize: '12px',
+                          lineHeight: 1.4,
+                          color: '#4b5563',
+                        }}
+                      >
+                        <span style={{ fontWeight: 600, color: '#6b7280' }}>Your note: </span>
+                        {agentFollowUp}
+                      </div>
+                    )}
                     {decision ? (
                       <div className={`text-sm font-medium ${decision === 'approved' ? 'text-green-600' : 'text-gray-400'}`}>
                         {decision === 'approved' ? '✅ Approved' : '⏭ Skipped'}
