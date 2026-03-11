@@ -103,12 +103,18 @@ serve(async (req) => {
     // For inbox agent, prepend live Gmail context
     if (agentId === "inbox") {
       try {
+        console.log("Inbox agent: fetching Gmail access token...");
         const accessToken = await getGmailAccessToken();
+        console.log("Inbox agent: access token obtained:", accessToken ? "yes" : "NO TOKEN");
         const inboxSummary = await fetchInboxSummary(accessToken);
-        systemPrompt = "## Current Inbox (unread)\n\n" + inboxSummary + "\n\n---\n\n" + systemPrompt;
+        console.log("Inbox agent: fetched inbox summary, length:", inboxSummary.length);
+        const inboxContext = inboxSummary.length > 0
+          ? "## Current Inbox (unread)\nYou have LIVE access to Jon's inbox. The following are REAL unread emails fetched just now. Use this data to answer questions about the inbox. Do NOT tell the user you can't access their email — you already have it.\n\n" + inboxSummary
+          : "## Current Inbox\nYou have live Gmail access but there are currently no unread emails. Tell the user their inbox is clear.";
+        systemPrompt = inboxContext + "\n\n---\n\n" + systemPrompt;
       } catch (e) {
         console.error("Failed to fetch Gmail inbox:", e);
-        systemPrompt = "## Current Inbox\n\n[Could not fetch inbox — Gmail API error]\n\n---\n\n" + systemPrompt;
+        systemPrompt = "## Current Inbox\n\n[Could not fetch inbox — Gmail API error: " + (e instanceof Error ? e.message : String(e)) + "]\n\n---\n\n" + systemPrompt;
       }
     }
 
