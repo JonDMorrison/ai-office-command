@@ -11,7 +11,7 @@ const agentImages: Record<string, string> = {
   bloomsuite: bloomsuiteImg,
   clinicleader: clinicleaderImg,
   projectpath: projectpathImg,
-  disc: discImg,
+  discprofile: discImg,
   inbox: inboxImg,
 };
 
@@ -73,7 +73,9 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState }: PixelAgentProp
         <img
           src={agentImages[agent.id]}
           alt={agent.name}
-          className="w-32 h-32 object-contain drop-shadow-lg"
+          className={`w-32 h-32 object-contain drop-shadow-lg ${
+            isTyping ? 'animate-agent-type' : isReading ? 'animate-agent-read' : 'animate-agent-breathe'
+          }`}
           style={{
             imageRendering: 'pixelated',
             filter: isTyping ? `drop-shadow(0 0 8px ${agent.colorHex}40)` : 'none',
