@@ -357,6 +357,18 @@
   background: hsl(30 15% 70%);
 }
 
+/* ===== Agent Idle Float ===== */
+@keyframes idle-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ===== Agent Walk Sway ===== */
+@keyframes walk-sway {
+  0%, 100% { transform: rotate(-5deg) translateY(0px); }
+  50% { transform: rotate(5deg) translateY(-2px); }
+}
+
 /* ===== Daily Standup Walk Animation ===== */
 @keyframes standup-walk {
   0%, 100% { transform: rotate(0deg); }
