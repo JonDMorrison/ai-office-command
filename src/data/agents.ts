@@ -22,6 +22,7 @@ export const agents: Agent[] = [
     product: 'BloomSuite',
     colorVar: 'agent-bloom',
     colorHex: '#22c55e',
+    avatar: '🌿',
     status: 'active',
     currentTask: 'Generating weekly content calendar for garden centres...',
     systemPrompt: `You are the BloomSuite Agent — the definitive AI expert on everything BloomSuite. You have deep knowledge of two core BloomSuite products:
