@@ -18,24 +18,42 @@ const Index = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background crt-flicker">
-      <div className="scanline-overlay" />
+    <div className="flex flex-col h-screen bg-background">
       <HeaderBar activeCount={activeCount} waitingCount={waitingCount} />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Office floor */}
-        <div className="flex-1 pixel-grid relative flex items-center justify-center p-8">
-          <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent pointer-events-none" />
-          <div className="absolute inset-4 border-2 border-border/30 rounded-lg pointer-events-none" />
-          <div className="absolute top-8 left-8 text-xl opacity-60 drop-shadow-[0_0_6px_hsl(var(--agent-bloom)/0.4)]">🌱</div>
-          <div className="absolute top-8 right-8 text-xl opacity-60 drop-shadow-[0_0_6px_hsl(var(--agent-bloom)/0.4)]">🌱</div>
-          <div className="absolute bottom-12 left-8 text-base opacity-50">☕</div>
-          <div className="absolute bottom-12 right-8 text-base opacity-50">📋</div>
-          <div className="absolute top-6 left-1/2 -translate-x-1/2 font-pixel text-[8px] text-muted-foreground/30 tracking-[0.3em] pointer-events-none">
-            · · · JON'S OFFICE · · ·
+        <div className="flex-1 office-floor relative flex items-center justify-center p-8 overflow-hidden">
+          {/* Window on back wall */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[60%] max-w-lg h-40 bg-gradient-to-b from-sky-300 via-sky-200 to-sky-100 rounded-b-2xl border-b-4 border-x-4 border-amber-800/30 shadow-lg overflow-hidden">
+            {/* Sun */}
+            <div className="absolute top-4 right-12 w-14 h-14 rounded-full bg-amber-200 shadow-[0_0_40px_15px_hsla(45,90%,70%,0.5)]" />
+            {/* Clouds */}
+            <div className="absolute top-8 left-8 w-20 h-6 bg-white/80 rounded-full blur-[1px]" />
+            <div className="absolute top-5 left-16 w-14 h-5 bg-white/70 rounded-full blur-[1px]" />
+            <div className="absolute top-12 left-[40%] w-24 h-7 bg-white/75 rounded-full blur-[1px]" />
+            {/* Window frame */}
+            <div className="absolute inset-0 border-4 border-amber-900/15 rounded-b-2xl pointer-events-none" />
+            <div className="absolute top-0 bottom-0 left-1/2 w-1 bg-amber-900/15" />
+            <div className="absolute left-0 right-0 top-1/2 h-1 bg-amber-900/15" />
           </div>
 
-          <div className="flex flex-wrap items-end justify-center gap-12 max-w-5xl">
+          {/* Warm light wash from window */}
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-64 bg-gradient-to-b from-amber-100/40 via-amber-50/20 to-transparent pointer-events-none" />
+
+          {/* Large plant left corner */}
+          <div className="absolute bottom-8 left-8 text-4xl opacity-80 select-none">🪴</div>
+          {/* Small succulent right */}
+          <div className="absolute bottom-8 right-10 text-2xl opacity-70 select-none">🌵</div>
+          {/* Coffee station */}
+          <div className="absolute top-44 right-8 text-xl opacity-60 select-none">☕</div>
+
+          {/* Room label */}
+          <div className="absolute top-44 left-8 text-xs font-medium text-foreground/30 tracking-wide pointer-events-none select-none">
+            Main Office
+          </div>
+
+          <div className="flex flex-wrap items-end justify-center gap-12 max-w-5xl mt-16">
             {agents.map(agent => (
               <PixelAgent
                 key={agent.id}
@@ -45,13 +63,6 @@ const Index = () => {
                 dynamicState={states[agent.id]}
               />
             ))}
-          </div>
-
-          <div className="absolute bottom-4 left-4 font-pixel text-[8px] text-muted-foreground/40 tracking-widest">
-            FLOOR 01 — MAIN OPS
-          </div>
-          <div className="absolute bottom-4 right-4 font-pixel text-[8px] text-muted-foreground/40 tracking-widest">
-            {agents.length} STATIONS ONLINE
           </div>
         </div>
 

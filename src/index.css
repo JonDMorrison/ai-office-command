@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Press+Start+2P&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,58 +6,51 @@
 
 @layer base {
   :root {
-    --background: 220 50% 5%;
-    --foreground: 140 80% 65%;
+    --background: 30 50% 97%;
+    --foreground: 220 20% 20%;
 
-    --card: 220 45% 8%;
-    --card-foreground: 140 80% 65%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 20%;
 
-    --popover: 220 45% 8%;
-    --popover-foreground: 140 80% 65%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 20%;
 
-    --primary: 140 80% 50%;
-    --primary-foreground: 220 50% 5%;
+    --primary: 175 40% 40%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 30% 15%;
-    --secondary-foreground: 140 60% 70%;
+    --secondary: 30 30% 93%;
+    --secondary-foreground: 220 20% 25%;
 
-    --muted: 220 30% 12%;
-    --muted-foreground: 140 20% 45%;
+    --muted: 30 20% 94%;
+    --muted-foreground: 220 10% 50%;
 
-    --accent: 140 60% 30%;
-    --accent-foreground: 140 80% 80%;
+    --accent: 175 30% 92%;
+    --accent-foreground: 175 40% 30%;
 
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 140 40% 20%;
-    --input: 220 30% 15%;
-    --ring: 140 80% 50%;
+    --border: 30 15% 88%;
+    --input: 30 15% 88%;
+    --ring: 175 40% 40%;
 
-    --radius: 0.25rem;
+    --radius: 0.75rem;
 
-    --sidebar-background: 220 45% 7%;
-    --sidebar-foreground: 140 60% 65%;
-    --sidebar-primary: 140 80% 50%;
-    --sidebar-primary-foreground: 220 50% 5%;
-    --sidebar-accent: 220 30% 15%;
-    --sidebar-accent-foreground: 140 60% 70%;
-    --sidebar-border: 140 40% 15%;
-    --sidebar-ring: 140 80% 50%;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 220 20% 25%;
+    --sidebar-primary: 175 40% 40%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 30 30% 95%;
+    --sidebar-accent-foreground: 220 20% 25%;
+    --sidebar-border: 30 15% 88%;
+    --sidebar-ring: 175 40% 40%;
 
-    /* Agent colors */
-    --agent-bloom: 140 70% 45%;
-    --agent-clinic: 210 80% 55%;
-    --agent-project: 40 90% 55%;
-    --agent-disc: 270 70% 60%;
-    --agent-inbox: 25 90% 55%;
-
-    /* Effects */
-    --glow-green: 0 0 20px hsla(140, 80%, 50%, 0.4);
-    --glow-blue: 0 0 20px hsla(210, 80%, 55%, 0.4);
-    --glow-amber: 0 0 20px hsla(40, 90%, 55%, 0.4);
-    --glow-purple: 0 0 20px hsla(270, 70%, 60%, 0.4);
-    --glow-orange: 0 0 20px hsla(25, 90%, 55%, 0.4);
+    /* Agent colors — warm pastels */
+    --agent-bloom: 150 45% 42%;
+    --agent-clinic: 210 55% 50%;
+    --agent-project: 35 75% 52%;
+    --agent-disc: 265 45% 55%;
+    --agent-inbox: 15 70% 55%;
   }
 }
 
@@ -67,9 +60,8 @@
   }
 
   body {
-    @apply bg-background text-foreground font-mono;
-    font-family: 'JetBrains Mono', monospace;
-    image-rendering: pixelated;
+    @apply bg-background text-foreground;
+    font-family: 'Inter', system-ui, sans-serif;
   }
 }
 
@@ -78,43 +70,24 @@
   font-family: 'Press Start 2P', monospace;
 }
 
-/* CRT Scanline overlay */
-.scanline-overlay {
-  pointer-events: none;
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  background: repeating-linear-gradient(
-    0deg,
-    transparent,
-    transparent 2px,
-    rgba(0, 0, 0, 0.15) 2px,
-    rgba(0, 0, 0, 0.15) 4px
-  );
-}
-
-/* CRT flicker */
-.crt-flicker {
-  animation: crt-flicker 0.15s infinite alternate;
-}
-
-@keyframes crt-flicker {
-  0% { opacity: 0.97; }
-  100% { opacity: 1; }
-}
-
-/* Pixel grid floor */
-.pixel-grid {
+/* Warm wood floor */
+.office-floor {
+  background-color: hsl(30 40% 78%);
   background-image:
-    linear-gradient(rgba(34, 197, 94, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 197, 94, 0.05) 1px, transparent 1px);
-  background-size: 16px 16px;
-}
-
-/* Agent bobbing animation */
-@keyframes agent-bob {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-3px); }
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 120px,
+      hsla(30, 30%, 65%, 0.15) 120px,
+      hsla(30, 30%, 65%, 0.15) 121px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 20px,
+      hsla(30, 25%, 70%, 0.08) 20px,
+      hsla(30, 25%, 70%, 0.08) 21px
+    );
 }
 
 /* Agent breathing idle */
@@ -123,29 +96,17 @@
   50% { transform: translateY(-2px) scale(1.01); }
 }
 
-/* Agent typing animation — quick subtle bounce */
+/* Agent typing animation */
 @keyframes agent-type-img {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   30% { transform: translateY(-1.5px) rotate(-0.8deg); }
   70% { transform: translateY(-1.5px) rotate(0.8deg); }
 }
 
-/* Agent reading — gentle lean */
+/* Agent reading */
 @keyframes agent-read {
   0%, 100% { transform: translateY(0) rotate(0deg); }
   50% { transform: translateY(-1px) rotate(1deg); }
-}
-
-/* Blink animation */
-@keyframes agent-blink {
-  0%, 94%, 100% { transform: scaleY(1); }
-  96% { transform: scaleY(0.1); }
-}
-
-/* Monitor glow pulse */
-@keyframes monitor-glow {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
 }
 
 /* Speech bubble fade */
@@ -166,10 +127,6 @@
   51%, 100% { opacity: 0; }
 }
 
-.animate-agent-bob {
-  animation: agent-bob 2s ease-in-out infinite;
-}
-
 .animate-agent-breathe {
   animation: agent-breathe 3s ease-in-out infinite;
 }
@@ -180,14 +137,6 @@
 
 .animate-agent-read {
   animation: agent-read 4s ease-in-out infinite;
-}
-
-.animate-agent-blink {
-  animation: agent-blink 4s ease-in-out infinite;
-}
-
-.animate-monitor-glow {
-  animation: monitor-glow 3s ease-in-out infinite;
 }
 
 .animate-bubble-appear {
@@ -208,14 +157,14 @@
 }
 
 ::-webkit-scrollbar-track {
-  background: hsl(220 45% 8%);
+  background: hsl(30 20% 95%);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsl(140 40% 20%);
+  background: hsl(30 15% 80%);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsl(140 60% 30%);
+  background: hsl(30 15% 70%);
 }

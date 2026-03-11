@@ -19,7 +19,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `> ${agent.name} Agent online.\n> Specialization: ${agent.role}\n> Status: ${agent.status.toUpperCase()}\n\nHow can I assist you today?`,
+      content: `Hi! I'm ${agent.name}, your ${agent.role} specialist. How can I help you today?`,
     },
   ]);
   const [input, setInput] = useState('');
@@ -39,7 +39,6 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
     setIsTyping(true);
 
     try {
-      // Build conversation history (exclude the initial greeting)
       const conversationMessages = messages
         .slice(1)
         .map(m => ({ role: m.role, content: m.content }));
@@ -59,7 +58,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
       console.error('Chat error:', err);
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: '⚠ Error connecting to agent. Check your Anthropic API key and try again.' },
+        { role: 'assistant', content: 'Sorry, I had trouble connecting. Please try again.' },
       ]);
     } finally {
       setIsTyping(false);
@@ -67,41 +66,32 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
   };
 
   return (
-    <div
-      className="w-96 h-full border-l flex flex-col"
-      style={{
-        borderColor: `${agent.colorHex}30`,
-        backgroundColor: 'hsl(220 50% 5% / 0.98)',
-      }}
-    >
+    <div className="w-96 h-full border-l border-border flex flex-col bg-card">
       {/* Header */}
-      <div
-        className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: `${agent.colorHex}30` }}
-      >
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <div className="flex items-center gap-3">
           <div
             className="w-3 h-3 rounded-full animate-status-pulse"
             style={{ backgroundColor: agent.colorHex }}
           />
           <div>
-            <div className="font-pixel text-[10px]" style={{ color: agent.colorHex }}>
-              {agent.name.toUpperCase()}
+            <div className="text-sm font-semibold" style={{ color: agent.colorHex }}>
+              {agent.name}
             </div>
-            <div className="text-[10px] text-muted-foreground">{agent.role}</div>
+            <div className="text-xs text-muted-foreground">{agent.role}</div>
           </div>
         </div>
         <div className="flex items-center gap-1">
           <button
             onClick={onOpenSkills}
-            className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
             title="Edit Skills"
           >
             <Settings size={14} />
           </button>
           <button
             onClick={onClose}
-            className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+            className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
           >
             <X size={14} />
           </button>
@@ -109,25 +99,18 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
-              className={`max-w-[85%] px-3 py-2 rounded text-xs whitespace-pre-wrap leading-relaxed ${
-                msg.role === 'user' ? 'bg-secondary text-secondary-foreground' : ''
+              className={`max-w-[85%] px-3.5 py-2.5 text-sm leading-relaxed ${
+                msg.role === 'user'
+                  ? 'bg-primary text-primary-foreground rounded-2xl rounded-br-md'
+                  : 'bg-secondary text-secondary-foreground rounded-2xl rounded-bl-md'
               }`}
-              style={
-                msg.role === 'assistant'
-                  ? {
-                      backgroundColor: `${agent.colorHex}10`,
-                      color: agent.colorHex,
-                      border: `1px solid ${agent.colorHex}20`,
-                    }
-                  : undefined
-              }
             >
               {msg.role === 'assistant' ? (
-                <div className="prose prose-sm prose-invert max-w-none [&_*]:text-inherit [&_*]:text-xs [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
+                <div className="prose prose-sm max-w-none [&_*]:text-inherit [&_*]:text-sm [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5">
                   <ReactMarkdown>{msg.content}</ReactMarkdown>
                 </div>
               ) : (
@@ -138,15 +121,12 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
         ))}
         {isTyping && (
           <div className="flex justify-start">
-            <div
-              className="px-3 py-2 rounded text-xs"
-              style={{
-                backgroundColor: `${agent.colorHex}10`,
-                color: agent.colorHex,
-                border: `1px solid ${agent.colorHex}20`,
-              }}
-            >
-              <span className="animate-cursor-blink">█</span> Processing...
+            <div className="bg-secondary text-muted-foreground px-3.5 py-2.5 rounded-2xl rounded-bl-md text-sm">
+              <span className="inline-flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '0ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '150ms' }} />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50 animate-bounce" style={{ animationDelay: '300ms' }} />
+              </span>
             </div>
           </div>
         )}
@@ -154,26 +134,23 @@ const ChatPanel = ({ agent, onClose, onOpenSkills }: ChatPanelProps) => {
       </div>
 
       {/* Input */}
-      <div className="p-3 border-t" style={{ borderColor: `${agent.colorHex}30` }}>
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: agent.colorHex }}>
-            &gt;
-          </span>
+      <div className="p-3 border-t border-border">
+        <div className="flex items-center gap-2 bg-secondary rounded-xl px-3 py-2">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && sendMessage()}
             placeholder={`Message ${agent.name}...`}
-            className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none"
+            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
           <button
             onClick={sendMessage}
             disabled={!input.trim() || isTyping}
-            className="p-1.5 rounded transition-colors disabled:opacity-30"
+            className="p-1.5 rounded-lg transition-colors disabled:opacity-30 hover:bg-primary/10"
             style={{ color: agent.colorHex }}
           >
-            <Send size={12} />
+            <Send size={16} />
           </button>
         </div>
       </div>
