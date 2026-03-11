@@ -202,16 +202,18 @@ serve(async (req) => {
     const data = await response.json();
     const text = data.content?.[0]?.text || "No response generated.";
 
-    // For inbox agent, parse and save any draft blocks
-    if (agentId === "inbox") {
+    // For inbox or bloomsuite agent, parse and save any draft blocks
+    if (agentId === "inbox" || agentId === "bloomsuite") {
       const drafts = parseDraftBlocks(text);
       if (drafts.length > 0) {
         try {
-          const accessToken = await getGmailAccessToken();
+          const accessToken = agentId === "bloomsuite"
+            ? await getGmailAccessToken(Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "")
+            : await getGmailAccessToken();
           await Promise.all(drafts.map(d => saveGmailDraft(accessToken, d.to, d.subject, d.body)));
-          console.log(`Saved ${drafts.length} Gmail draft(s)`);
+          console.log(`Saved ${drafts.length} Gmail draft(s) for ${agentId}`);
         } catch (e) {
-          console.error("Failed to save Gmail drafts:", e);
+          console.error(`Failed to save Gmail drafts for ${agentId}:`, e);
         }
       }
     }
