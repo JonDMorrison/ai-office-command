@@ -12,6 +12,7 @@ import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
 import ApprovalQueue from '@/components/office/ApprovalQueue';
 import ActivityFeed from '@/components/office/ActivityFeed';
+import OperationsRail from '@/components/office/OperationsRail';
 
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -24,7 +25,6 @@ const Index = () => {
   const { pendingCount, fetchApprovals } = useApprovals();
   const followUpNotes = useRef<Record<string, string>>({});
 
-  // Load persisted data on mount
   useEffect(() => {
     fetchTasks({ status: TASK_STATUS.QUEUED });
     fetchApprovals({ status: 'pending' });
@@ -49,15 +49,28 @@ const Index = () => {
     if (selectedAgentId) setSelectedAgentId(null);
   }, [selectedAgentId]);
 
-  // Desk positions: U-shape layout
-  // Desk positions: U-shape with executive centered and elevated
-  const deskPositions = [
-    { top: '6%', left: '8%' },       // bloomsuite
-    { top: '6%', left: '50%', transform: 'translateX(-50%)' },  // clinicleader
-    { top: '6%', right: '8%' },      // projectpath
-    { top: '54%', left: '10%' },     // disc
-    { top: '54%', right: '10%' },    // inbox
-    { top: '48%', left: '50%', transform: 'translateX(-50%)' }, // executive — centered, slightly higher
+  /*
+   * Layout: The control room has three visual rows
+   *
+   * Row 1 (top):     Three workspace agents spread across the top
+   * Row 2 (middle):  Executive desk centered, flanked by DISC and Inbox
+   * Row 3 (bottom):  Operations rail (left) + Activity feed (right) overlaid
+   *
+   * The executive is centered and slightly larger — the command position.
+   * Workspace agents arc above. Utility agents (DISC, Inbox) flank the executive.
+   */
+
+  // Agent order: [bloomsuite, clinicleader, projectpath, disc, inbox, executive]
+  const deskPositions: React.CSSProperties[] = [
+    // Top row — workspace agents
+    { top: '4%', left: '6%' },                                              // bloomsuite
+    { top: '2%', left: '50%', transform: 'translateX(-50%)' },             // clinicleader (center-top)
+    { top: '4%', right: '6%' },                                             // projectpath
+    // Middle row — utility agents flanking executive
+    { top: '50%', left: '6%' },                                             // disc
+    { top: '50%', right: '6%' },                                            // inbox
+    // Executive — centered command position
+    { top: '46%', left: '50%', transform: 'translateX(-50%)' },             // executive
   ];
 
   return (
@@ -72,29 +85,21 @@ const Index = () => {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Isometric office floor */}
-        <div className="flex-1 iso-floor relative overflow-hidden">
+        {/* Control room floor */}
+        <div className="flex-1 control-room-floor relative overflow-hidden">
 
-          {/* Office props */}
-          <div className="iso-prop" style={{ top: '4%', right: '4%' }}>
-            <div className="iso-whiteboard" />
-          </div>
-          <div className="iso-prop" style={{ bottom: '18%', left: '5%' }}>
-            <div className="iso-watercooler" />
-          </div>
-          <div className="iso-prop" style={{ bottom: '12%', left: '8%' }}>
-            <div className="iso-plant" />
-          </div>
-          <div className="iso-prop" style={{ bottom: '8%', right: '6%' }}>
-            <div className="iso-plant" />
-          </div>
-          <div className="iso-prop" style={{ top: '45%', right: '5%' }}>
-            <div className="iso-plant" style={{ width: '22px', height: '16px' }} />
-          </div>
+          {/* Executive zone — subtle radial glow behind executive desk */}
+          <div
+            className="zone-executive"
+            style={{ top: '38%', width: '320px', height: '240px' }}
+          />
 
-          {/* Room label */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-medium text-muted-foreground/40 tracking-widest uppercase pointer-events-none select-none">
-            Main Office
+          {/* Zone labels */}
+          <div className="absolute top-1 left-1/2 -translate-x-1/2 text-[8px] font-semibold text-muted-foreground/30 tracking-[0.2em] uppercase pointer-events-none select-none">
+            Workspace Agents
+          </div>
+          <div className="absolute top-[42%] left-1/2 -translate-x-1/2 -translate-y-full text-[8px] font-semibold text-muted-foreground/20 tracking-[0.15em] uppercase pointer-events-none select-none">
+            Command
           </div>
 
           {/* Agent desk pods */}
@@ -113,6 +118,12 @@ const Index = () => {
             </div>
           ))}
 
+          {/* Operations Rail — bottom left, inside the room */}
+          <OperationsRail />
+
+          {/* Activity Feed — bottom right, inside the room */}
+          <ActivityFeed />
+
           {/* Daily Standup overlay */}
           {standupActive && (
             <DailyStandup
@@ -121,9 +132,9 @@ const Index = () => {
               onCreateTask={createTask}
             />
           )}
-
         </div>
 
+        {/* Side panels */}
         {selectedAgent && !showApprovals && (
           <ChatPanel
             agent={selectedAgent}
@@ -137,8 +148,6 @@ const Index = () => {
           <ApprovalQueue onClose={() => setShowApprovals(false)} />
         )}
       </div>
-
-      <ActivityFeed />
 
       <StatusBar
         states={states}

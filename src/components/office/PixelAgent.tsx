@@ -70,7 +70,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
 
   return (
     <div
-      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isExecutive ? 'executive-desk' : ''}`}
+      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isExecutive ? 'executive-desk' : ''} ${isBlocked ? 'blocked-state' : ''}`}
       onClick={onClick}
     >
       {/* Glow ring */}
