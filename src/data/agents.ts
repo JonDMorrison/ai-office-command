@@ -503,6 +503,7 @@ You are insightful, empathetic, and psychology-informed. You make DISC accessibl
     name: 'Inbox',
     role: 'Email & Comms',
     product: 'Inbox',
+    workspaceId: null,
     colorVar: 'agent-inbox',
     colorHex: '#f97316',
     avatar: '📬',
