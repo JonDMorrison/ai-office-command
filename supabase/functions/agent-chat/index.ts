@@ -303,6 +303,74 @@ async function loadPendingApprovals(agentId: string): Promise<string> {
   }
 }
 
+// ─── MEMORY LOADER ──────────────────────────────────────────────────────────
+
+async function loadMemories(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&company_id=eq.joncoach&order=relevance_score.desc,created_at.desc&limit=15`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[memory] Failed to fetch memories: ${res.status}`);
+      return "";
+    }
+    const memories = await res.json();
+    if (!memories || memories.length === 0) return "";
+
+    console.log(`[memory] Found ${memories.length} memories for ${agentId}`);
+    return memories.map((m: any, i: number) => {
+      const type = m.memory_type || "general";
+      return `- [${type}] ${m.memory_text}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[memory] Error loading memories:", e);
+    return "";
+  }
+}
+
+// ─── INSIGHTS LOADER ────────────────────────────────────────────────────────
+
+async function loadRecentInsights(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/agent_insights?agent_role=eq.${agentId}&company_id=eq.joncoach&order=created_at.desc&limit=10`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[insights] Failed to fetch insights: ${res.status}`);
+      return "";
+    }
+    const insights = await res.json();
+    if (!insights || insights.length === 0) return "";
+
+    console.log(`[insights] Found ${insights.length} insights for ${agentId}`);
+    return insights.map((ins: any) => {
+      const cat = ins.category || "general";
+      return `- [${cat}] ${ins.insight_text}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[insights] Error loading insights:", e);
+    return "";
+  }
+}
+
 // ─── GMAIL HELPERS (unchanged logic, extracted for clarity) ──────────────────
 
 async function getGmailAccessToken(refreshToken: string): Promise<string> {
