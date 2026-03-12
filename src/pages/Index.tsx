@@ -15,7 +15,13 @@ const Index = () => {
   const [standupActive, setStandupActive] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
+  const { tasks, fetchTasks, createTask } = useTasks();
   const followUpNotes = useRef<Record<string, string>>({});
+
+  // Load persisted tasks on mount
+  useEffect(() => {
+    fetchTasks({ status: 'approved' });
+  }, [fetchTasks]);
 
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
