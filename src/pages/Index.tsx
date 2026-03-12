@@ -25,7 +25,7 @@ const Index = () => {
 
   // Load persisted data on mount
   useEffect(() => {
-    fetchTasks({ status: 'approved' });
+    fetchTasks({ status: TASK_STATUS.QUEUED });
     fetchApprovals({ status: 'pending' });
   }, [fetchTasks, fetchApprovals]);
 
