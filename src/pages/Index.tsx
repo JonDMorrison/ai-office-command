@@ -157,6 +157,10 @@ const Index = () => {
         {showApprovals && (
           <ApprovalQueue onClose={() => setShowApprovals(false)} />
         )}
+
+        {showActivity && (
+          <ActivityFeedPanel onClose={() => setShowActivity(false)} />
+        )}
       </div>
 
       <StatusBar
