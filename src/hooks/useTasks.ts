@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { TASK_STATUS, COMPANY_ID, type TaskStatus } from '@/lib/constants';
+import { TASK_STATUS, type TaskStatus, getWorkspaceForAgent } from '@/lib/constants';
 
 export interface Task {
   id: string;
-  company_id: string;
+  workspace_id: string | null;
   agent_role: string;
   title: string;
   description: string | null;
@@ -24,15 +24,15 @@ export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchTasks = useCallback(async (filters?: { status?: string; agent_role?: string }) => {
+  const fetchTasks = useCallback(async (filters?: { status?: string; agent_role?: string; workspace_id?: string }) => {
     setLoading(true);
     try {
       let query = (supabase
         .from('tasks' as any)
         .select('*') as any)
-        .eq('company_id', COMPANY_ID)
         .order('created_at', { ascending: false });
 
+      if (filters?.workspace_id) query = query.eq('workspace_id', filters.workspace_id);
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.agent_role) query = query.eq('agent_role', filters.agent_role);
 
@@ -58,8 +58,9 @@ export function useTasks() {
     input_payload?: Record<string, unknown>;
   }) => {
     try {
+      const workspaceId = getWorkspaceForAgent(task.agent_role);
       const row = {
-        company_id: COMPANY_ID,
+        workspace_id: workspaceId,
         agent_role: task.agent_role,
         title: task.title,
         description: task.description || null,
@@ -78,7 +79,6 @@ export function useTasks() {
 
       if (error) throw error;
 
-      // Also log an event
       await (supabase.from('task_events' as any).insert({
         task_id: (data as any).id,
         event_type: 'created',

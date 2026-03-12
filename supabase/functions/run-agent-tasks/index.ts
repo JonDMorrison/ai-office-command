@@ -1,0 +1,447 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+// ─── SKILL MAPPING ──────────────────────────────────────────────────────────
+const AGENT_SKILLS: Record<string, string[]> = {
+  bloomsuite: ["joncoach-core", "bloomsuite-agent", "bloomsuite-copywriting", "brainstorming", "frontend-design"],
+  clinicleader: ["joncoach-core", "clinicleader-agent", "internal-comms", "brainstorming"],
+  projectpath: ["joncoach-core", "projectpath-agent", "supabase-best-practices", "nextjs-best-practices"],
+  disc: ["joncoach-core", "disc-agent", "frontend-design", "supabase-best-practices"],
+  inbox: ["joncoach-core", "inbox-agent", "internal-comms"],
+};
+
+// ─── TYPES ──────────────────────────────────────────────────────────────────
+
+interface Task {
+  id: string;
+  workspace_id: string | null;
+  agent_role: string;
+  title: string;
+  description: string | null;
+  task_type: string;
+  status: string;
+  priority: number;
+  input_payload: Record<string, unknown>;
+  output_payload: Record<string, unknown>;
+}
+
+interface Workspace {
+  id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  gmail_secret_key: string | null;
+}
+
+interface ParsedArtifacts {
+  message?: string;
+  output?: string;
+  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number }>;
+  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string }>;
+  suggested_memories?: string[];
+  insights?: string[];
+}
+
+// ─── HELPERS ────────────────────────────────────────────────────────────────
+
+function getSupabaseHeaders(): Record<string, string> {
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${supabaseKey}`,
+    "Content-Type": "application/json",
+    Prefer: "return=representation",
+  };
+}
+
+function getSupabaseUrl(): string {
+  return Deno.env.get("SUPABASE_URL") || "";
+}
+
+async function fetchSkillContent(skillName: string, githubToken: string): Promise<string> {
+  const url = `https://api.github.com/repos/JonDMorrison/JonCoach/contents/.claude/skills/${skillName}/SKILL.md`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${githubToken}`,
+      Accept: "application/vnd.github.v3.raw",
+    },
+  });
+  if (!res.ok) return `[Skill "${skillName}" could not be loaded]`;
+  return await res.text();
+}
+
+async function loadSkillModules(agentId: string, githubToken: string): Promise<string> {
+  const skillNames = AGENT_SKILLS[agentId] || [];
+  if (skillNames.length === 0) return "";
+  const contents = await Promise.all(skillNames.map(name => fetchSkillContent(name, githubToken)));
+  return contents.join("\n\n---\n\n");
+}
+
+async function loadRecentMemory(agentId: string, workspaceId: string | null): Promise<string> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  
+  let url = `${baseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&order=relevance_score.desc,created_at.desc&limit=10`;
+  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+  
+  const res = await fetch(url, { headers });
+  if (!res.ok) return "";
+  const memories = await res.json();
+  if (!memories?.length) return "";
+  
+  return memories.map((m: any) => `- [${m.memory_type}] ${m.memory_text}`).join("\n");
+}
+
+async function updateTaskStatus(taskId: string, status: string, note?: string): Promise<void> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  
+  const updates: Record<string, unknown> = { status };
+  if (status === "completed") updates.completed_at = new Date().toISOString();
+  
+  await fetch(`${baseUrl}/rest/v1/tasks?id=eq.${taskId}`, {
+    method: "PATCH",
+    headers: { ...headers, Prefer: "return=minimal" },
+    body: JSON.stringify(updates),
+  });
+  
+  // Log event
+  await fetch(`${baseUrl}/rest/v1/task_events`, {
+    method: "POST",
+    headers: { ...headers, Prefer: "return=minimal" },
+    body: JSON.stringify({
+      task_id: taskId,
+      event_type: "status_changed",
+      event_payload: { new_status: status, note: note || null },
+    }),
+  });
+}
+
+async function insertBatch(table: string, rows: Record<string, unknown>[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const baseUrl = getSupabaseUrl();
+  const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
+  
+  const res = await fetch(`${baseUrl}/rest/v1/${table}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(rows),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    console.error(`[run-tasks] Failed to insert into ${table}: ${res.status} ${err}`);
+    return 0;
+  }
+  return rows.length;
+}
+
+// ─── EXECUTION PROMPT ───────────────────────────────────────────────────────
+
+function buildExecutionPrompt(
+  task: Task,
+  workspace: Workspace | null,
+  skills: string,
+  recentMemory: string
+): string {
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-CA", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+    timeZone: "America/Toronto",
+  });
+
+  return `
+## Identity
+You are the ${task.agent_role} agent for Jon Morrison${workspace ? `'s ${workspace.name} business` : ''}.
+Today is ${dateStr}.
+
+## Workspace
+${workspace?.description || 'Executive layer — cross-workspace operations.'}
+
+## Your Memory
+${recentMemory || 'No previous memory for this workspace.'}
+
+## Skills
+${skills}
+
+## Task
+You have been assigned the following task to execute autonomously:
+
+Title: ${task.title}
+Description: ${task.description || 'No additional description.'}
+Priority: ${task.priority}
+Input: ${JSON.stringify(task.input_payload || {})}
+
+Execute this task fully. Produce real output — not a plan to do the work, but the actual work.
+If the output is something outbound (email, social post), put it in suggested_approvals.
+If you cannot complete this task, explain exactly what is blocking you.
+
+## Response Format
+Respond with a JSON block:
+
+\`\`\`json
+{
+  "message": "Summary of what you did",
+  "output": "The actual deliverable content if applicable",
+  "suggested_tasks": [],
+  "suggested_approvals": [],
+  "suggested_memories": [],
+  "insights": []
+}
+\`\`\`
+
+Rules:
+- The JSON block must be the LAST thing in your response.
+- Tasks: verb-led, specific, actionable.
+- Approvals: REQUIRED for any outbound email, social post, or public content. Include the full draft in preview_text.
+- Memories: only for genuinely useful facts/preferences.
+  `.trim();
+}
+
+// ─── PARSE RESPONSE ─────────────────────────────────────────────────────────
+
+function parseAgentResponse(fullText: string): ParsedArtifacts {
+  const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```\s*$/;
+  const match = fullText.match(jsonBlockRegex);
+  
+  if (!match) {
+    return { message: fullText, output: fullText };
+  }
+  
+  try {
+    const parsed = JSON.parse(match[1]);
+    return parsed as ParsedArtifacts;
+  } catch {
+    return { message: fullText, output: fullText };
+  }
+}
+
+// ─── EXECUTE SINGLE TASK ────────────────────────────────────────────────────
+
+async function executeTask(task: Task, workspace: Workspace | null, apiKey: string, githubToken: string): Promise<{
+  taskId: string;
+  status: string;
+  message: string;
+  artifactCounts: { tasks: number; approvals: number; memories: number; insights: number };
+}> {
+  const result = {
+    taskId: task.id,
+    status: "completed" as string,
+    message: "",
+    artifactCounts: { tasks: 0, approvals: 0, memories: 0, insights: 0 },
+  };
+
+  try {
+    // Set to in_progress
+    await updateTaskStatus(task.id, "in_progress", "Picked up by run-agent-tasks");
+
+    // Load context in parallel
+    const [skills, recentMemory] = await Promise.all([
+      loadSkillModules(task.agent_role, githubToken),
+      loadRecentMemory(task.agent_role, task.workspace_id),
+    ]);
+
+    // Build prompt and call Claude
+    const systemPrompt = buildExecutionPrompt(task, workspace, skills, recentMemory);
+
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 4096,
+        system: systemPrompt,
+        messages: [{ role: "user", content: `Execute this task: ${task.title}\n\n${task.description || ''}` }],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`[run-tasks] Claude API error for task ${task.id}: ${response.status} ${errText}`);
+      await updateTaskStatus(task.id, "failed", `Claude API error: ${response.status}`);
+      result.status = "failed";
+      result.message = `Claude API error: ${response.status}`;
+      return result;
+    }
+
+    const data = await response.json();
+    const fullText = data.content?.[0]?.text || "";
+    const parsed = parseAgentResponse(fullText);
+    
+    result.message = parsed.message || fullText.slice(0, 200);
+
+    // Process artifacts in parallel
+    const workspaceId = task.workspace_id;
+    const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+      insertBatch("tasks", (parsed.suggested_tasks || []).map(t => ({
+        workspace_id: workspaceId,
+        agent_role: task.agent_role,
+        title: (t.title || "Untitled").slice(0, 120),
+        description: t.description || null,
+        task_type: t.task_type || "general",
+        priority: t.priority || 3,
+        status: "queued",
+        source: "agent_task",
+      }))),
+      insertBatch("approvals", (parsed.suggested_approvals || []).map(a => ({
+        workspace_id: workspaceId,
+        agent_role: task.agent_role,
+        approval_type: a.approval_type || "general",
+        title: a.title || "Untitled",
+        preview_text: a.preview_text || null,
+        full_payload: { platform: a.platform },
+        status: "pending",
+      }))),
+      insertBatch("agent_memories", (parsed.suggested_memories || []).map(m => ({
+        workspace_id: workspaceId,
+        agent_role: task.agent_role,
+        memory_text: m,
+        memory_type: "preference",
+        source: "task_execution",
+      }))),
+      insertBatch("agent_insights", (parsed.insights || []).map(i => ({
+        workspace_id: workspaceId,
+        agent_role: task.agent_role,
+        insight_text: i,
+        category: "general",
+      }))),
+    ]);
+
+    result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount };
+
+    // Determine final status
+    if (approvalCount > 0) {
+      await updateTaskStatus(task.id, "waiting_for_input", `Created ${approvalCount} approval items`);
+      result.status = "waiting_for_input";
+    } else {
+      // Save output to task
+      const baseUrl = getSupabaseUrl();
+      const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
+      await fetch(`${baseUrl}/rest/v1/tasks?id=eq.${task.id}`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+          output_payload: { message: parsed.message, output: parsed.output },
+        }),
+      });
+      
+      await fetch(`${baseUrl}/rest/v1/task_events`, {
+        method: "POST",
+        headers: { ...headers, Prefer: "return=minimal" },
+        body: JSON.stringify({
+          task_id: task.id,
+          event_type: "completed",
+          event_payload: { artifact_counts: result.artifactCounts },
+        }),
+      });
+      
+      result.status = "completed";
+    }
+
+    // Log to agent_outputs
+    await insertBatch("agent_outputs", [{
+      workspace_id: workspaceId,
+      agent_role: task.agent_role,
+      raw_message: (parsed.message || fullText).slice(0, 5000),
+      tasks_created: taskCount,
+      approvals_created: approvalCount,
+      memories_created: memoryCount,
+      insights_created: insightCount,
+      parse_success: true,
+    }]);
+
+  } catch (e) {
+    console.error(`[run-tasks] Error executing task ${task.id}:`, e);
+    await updateTaskStatus(task.id, "failed", e instanceof Error ? e.message : "Unknown error");
+    result.status = "failed";
+    result.message = e instanceof Error ? e.message : "Unknown error";
+  }
+
+  return result;
+}
+
+// ─── MAIN HANDLER ───────────────────────────────────────────────────────────
+
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!ANTHROPIC_API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN");
+    if (!GITHUB_TOKEN) {
+      return new Response(
+        JSON.stringify({ error: "GITHUB_TOKEN is not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const baseUrl = getSupabaseUrl();
+    const headers = getSupabaseHeaders();
+
+    // 1. Fetch queued tasks (up to 5, ordered by priority then created_at)
+    const tasksRes = await fetch(
+      `${baseUrl}/rest/v1/tasks?status=eq.queued&order=priority.asc,created_at.asc&limit=5`,
+      { headers }
+    );
+    if (!tasksRes.ok) {
+      const err = await tasksRes.text();
+      throw new Error(`Failed to fetch queued tasks: ${tasksRes.status} ${err}`);
+    }
+    const queuedTasks: Task[] = await tasksRes.json();
+
+    if (queuedTasks.length === 0) {
+      return new Response(
+        JSON.stringify({ message: "No queued tasks to run.", results: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log(`[run-tasks] Found ${queuedTasks.length} queued tasks`);
+
+    // 2. Load workspaces for context
+    const workspacesRes = await fetch(`${baseUrl}/rest/v1/workspaces?is_active=eq.true`, { headers });
+    const workspaces: Workspace[] = workspacesRes.ok ? await workspacesRes.json() : [];
+    const workspaceMap = new Map(workspaces.map(w => [w.id, w]));
+
+    // 3. Execute tasks sequentially (to stay within edge function time limits)
+    const results = [];
+    for (const task of queuedTasks) {
+      const workspace = task.workspace_id ? workspaceMap.get(task.workspace_id) || null : null;
+      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN);
+      results.push(result);
+      console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status}`);
+    }
+
+    return new Response(
+      JSON.stringify({
+        message: `Processed ${results.length} tasks.`,
+        results,
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (e) {
+    console.error("[run-tasks] Error:", e);
+    return new Response(
+      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+});
