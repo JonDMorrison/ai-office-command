@@ -66,6 +66,7 @@ const Index = () => {
         onStartStandup={() => setStandupActive(true)}
         pendingApprovals={pendingCount}
         onOpenApprovals={handleOpenApprovals}
+        onTasksRan={refetchAgentStates}
       />
 
       <div className="flex flex-1 overflow-hidden">
