@@ -540,11 +540,13 @@ serve(async (req) => {
 
     // 3. Execute tasks sequentially (to stay within edge function time limits)
     const results = [];
+    let totalTasksCreatedThisRun = 0;
     for (const task of queuedTasks) {
       const workspace = task.workspace_id ? workspaceMap.get(task.workspace_id) || null : null;
-      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN);
+      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN, totalTasksCreatedThisRun);
+      totalTasksCreatedThisRun += result.artifactCounts.tasks;
       results.push(result);
-      console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status}`);
+      console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status} | Total tasks created this run: ${totalTasksCreatedThisRun}`);
     }
 
     return new Response(
