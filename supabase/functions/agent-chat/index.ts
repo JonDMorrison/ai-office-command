@@ -919,13 +919,9 @@ serve(async (req) => {
       workspace = await loadWorkspace(workspaceId);
     }
 
-    // Load all context in parallel
-    const [skillContent, activeTasks, pendingApprovals, memories, recentInsights, inboxContext] = await Promise.all([
+    // Load skills and inbox context in parallel
+    const [skillContents, inboxContext] = await Promise.all([
       loadSkillModules(agentId, GITHUB_TOKEN),
-      loadActiveTasks(agentId, workspaceId),
-      loadPendingApprovals(agentId, workspaceId),
-      loadMemories(agentId, workspaceId),
-      loadRecentInsights(agentId, workspaceId),
       (agentId === "bloomsuite")
         ? buildBloomsuiteInboxContext().catch(e => {
             console.error("[inbox-ctx] BloomSuite error:", e);
@@ -939,17 +935,8 @@ serve(async (req) => {
           : Promise.resolve(undefined),
     ]);
 
-    // Assemble system prompt
-    const systemPrompt = buildPromptScaffold({
-      agentId,
-      workspace,
-      skillContent,
-      inboxContext: inboxContext || undefined,
-      activeTasks,
-      pendingApprovals,
-      memories,
-      insights: recentInsights,
-    });
+    // Assemble system prompt (loads workspace, tasks, memory, approvals internally)
+    const systemPrompt = await buildSystemPrompt(agentId, skillContents, inboxContext || undefined);
 
     console.log(`[agent-chat] System prompt: ${systemPrompt.length} chars`);
 
