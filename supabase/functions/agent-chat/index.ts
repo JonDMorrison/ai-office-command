@@ -77,26 +77,43 @@ Format (only include arrays that have items):
 \\\`\\\`\\\`json
 {
   "suggested_tasks": [
-    { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "priority": 2 }
+    { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "urgency_score": 4, "impact_score": 5 }
   ],
   "suggested_approvals": [
     { "approval_type": "social_post|email_draft|public_content", "title": "What Jon sees", "preview_text": "The full draft content", "platform": "linkedin" }
   ],
   "suggested_memories": [
-    "Short declarative statement about a preference, fact, pattern, or decision"
+    "Jon prefers short punchy LinkedIn posts without emojis"
   ],
   "insights": [
-    "Observation about market, product, audience, or operations"
+    { "insight_text": "Garden centers consistently struggle with CRM automation", "evidence": "3 inbox threads from BloomSuite customers mentioned this", "signal_count": 3 }
   ]
 }
 \\\`\\\`\\\`
+
+## Task Scoring
+- urgency_score (1-5): How time-sensitive. 5 = needs attention today.
+- impact_score (1-5): How much it moves the needle. 5 = directly affects revenue or traction.
+- execution_priority = urgency × impact (computed automatically).
+
+## Memory Rules
+Only store memories that capture a genuine preference, decision, or pattern.
+Good: "Jon prefers BloomSuite messaging focused on simplicity and consolidation"
+Bad: "Jon likes clear explanations" (too generic)
+Memories MUST reference Jon's actual words or decisions.
+
+## Insight Rules
+Only add an insight when you can cite evidence.
+Format MUST include evidence and signal_count.
+Never add an insight with signal_count < 2.
+Never add an insight that merely describes what the product does.
+Insights must be actionable or predictive.
 
 Rules:
 - The JSON block must be the LAST thing in your response.
 - If the conversation is simple Q&A, do NOT append JSON.
 - Tasks: verb-led, specific, actionable.
 - Approvals: REQUIRED for any outbound email, social post, or public content.
-- Memories: only for genuinely useful facts/preferences, not trivial details.
 - When drafting emails, ALSO use the [DRAFT]...[/DRAFT] block format for Gmail integration.`;
 
 // ─── SUPABASE HELPERS ───────────────────────────────────────────────────────

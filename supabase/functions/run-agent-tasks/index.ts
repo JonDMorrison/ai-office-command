@@ -25,6 +25,7 @@ interface Task {
   task_type: string;
   status: string;
   priority: number;
+  depth: number;
   input_payload: Record<string, unknown>;
   output_payload: Record<string, unknown>;
 }
