@@ -11,6 +11,7 @@ import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
 import ApprovalQueue from '@/components/office/ApprovalQueue';
+import ActivityFeed from '@/components/office/ActivityFeed';
 
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
@@ -136,6 +137,8 @@ const Index = () => {
           <ApprovalQueue onClose={() => setShowApprovals(false)} />
         )}
       </div>
+
+      <ActivityFeed />
 
       <StatusBar
         states={states}
