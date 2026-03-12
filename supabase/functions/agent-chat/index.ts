@@ -156,37 +156,102 @@ async function loadAllWorkspaces(): Promise<Workspace[]> {
   }
 }
 
-// ─── PROMPT SCAFFOLD ────────────────────────────────────────────────────────
+// ─── SYSTEM PROMPT BUILDER ──────────────────────────────────────────────────
 
-interface ScaffoldInput {
-  agentId: string;
-  workspace?: Workspace | null;
-  skillContent: string;
-  inboxContext?: string;
-  activeTasks?: string;
-  pendingApprovals?: string;
-  memories?: string;
-  insights?: string;
-}
+const AGENT_NAMES: Record<string, string> = {
+  bloomsuite: "BloomSuite Agent",
+  clinicleader: "ClinicLeader Agent",
+  projectpath: "ProjectPath Agent",
+  disc: "DISC Profile Agent",
+  inbox: "Inbox & Communications Agent",
+  executive: "Chief of Staff",
+};
 
-function buildPromptScaffold(input: ScaffoldInput): string {
+async function buildSystemPrompt(
+  agentId: string,
+  skillContents: string[],
+  gmailContext?: string
+): Promise<string> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+
+  // Determine workspace ID
+  const workspaceId = getWorkspaceForAgent(agentId);
+
+  // Load workspace, tasks, memory, approvals in parallel
+  const [workspaceRes, tasksRes, memoryRes, approvalsRes] = await Promise.all([
+    workspaceId
+      ? fetch(`${baseUrl}/rest/v1/workspaces?id=eq.${workspaceId}&limit=1`, { headers })
+      : Promise.resolve(null),
+    (() => {
+      let url: string;
+      if (agentId === "executive") {
+        url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=execution_priority.desc.nullslast,created_at.desc&limit=20`;
+      } else if (workspaceId) {
+        url = `${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10`;
+      } else {
+        url = `${baseUrl}/rest/v1/tasks?agent_role=eq.${agentId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10`;
+      }
+      return fetch(url, { headers });
+    })(),
+    (() => {
+      let url: string;
+      if (agentId === "executive") {
+        url = `${baseUrl}/rest/v1/agent_memories?order=relevance_score.desc,created_at.desc&limit=30`;
+      } else if (workspaceId) {
+        url = `${baseUrl}/rest/v1/agent_memories?workspace_id=eq.${workspaceId}&order=relevance_score.desc,created_at.desc&limit=15`;
+      } else {
+        url = `${baseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&order=relevance_score.desc,created_at.desc&limit=15`;
+      }
+      return fetch(url, { headers });
+    })(),
+    (() => {
+      let url: string;
+      if (agentId === "executive") {
+        url = `${baseUrl}/rest/v1/approvals?status=eq.pending&order=created_at.desc&limit=10`;
+      } else if (workspaceId) {
+        url = `${baseUrl}/rest/v1/approvals?workspace_id=eq.${workspaceId}&status=eq.pending&order=created_at.desc&limit=5`;
+      } else {
+        url = `${baseUrl}/rest/v1/approvals?agent_role=eq.${agentId}&status=eq.pending&order=created_at.desc&limit=5`;
+      }
+      return fetch(url, { headers });
+    })(),
+  ]);
+
+  const workspace = workspaceRes ? ((await workspaceRes.json()) as any[])?.[0] || null : null;
+  const activeTasks: any[] = tasksRes.ok ? await tasksRes.json() : [];
+  const recentMemory: any[] = memoryRes.ok ? await memoryRes.json() : [];
+  const pendingApprovals: any[] = approvalsRes.ok ? await approvalsRes.json() : [];
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-CA", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "America/Vancouver",
+  });
+
   const sections: string[] = [];
-  const sectionNames: string[] = [];
-  const agentLabel = agentId_toLabel(input.agentId);
 
-  // A. Agent Identity
-  if (input.agentId === "executive") {
-    sections.push(`## Agent Identity\nYou are Jon Morrison's **Chief of Staff and Executive Agent**.\nYou do not belong to any single product — you see across all of them.\nYour job is to help Jon make the right decision about where to spend his time.`);
-  } else {
-    sections.push(`## Agent Identity\nYou are the **${agentLabel}** agent working for **Jon Morrison**.`);
-  }
-  sectionNames.push("A:Identity");
+  // 1. Identity
+  sections.push(`## Identity
+You are the ${AGENT_NAMES[agentId] || agentId} for Jon Morrison.
+Today is ${dateStr} at ${timeStr} Pacific Time.
+You work exclusively for Jon — a Canadian entrepreneur running multiple SaaS products from Abbotsford, BC.`);
 
-  // B. Workspace Context
-  if (input.workspace) {
-    sections.push(`## Workspace Context\n${input.workspace.description || input.workspace.name}`);
-    sectionNames.push("B:Workspace");
-  } else if (input.agentId === "executive") {
+  // 2. Workspace context
+  if (workspace) {
+    sections.push(`## Workspace
+Product: ${workspace.name}
+Description: ${workspace.description}
+GitHub: ${workspace.github_repo}
+Supabase Project: ${workspace.supabase_project_id}`);
+  } else if (agentId === "executive") {
     sections.push(`## Jon's Core Priorities (in order)
 1. BloomSuite — needs category building, not more features
 2. ClinicLeader — strongest positioning, blocked by distribution
@@ -199,67 +264,49 @@ function buildPromptScaffold(input: ScaffoldInput): string {
 - One primary product per day, one secondary experiment
 - Bad week = constant activity, no learning, spinning wheels
 - Good week = progress on one core product, real user interaction`);
-    sectionNames.push("B:ExecutivePriorities");
   }
 
-  // C. Responsibility Scope
-  const roleResp = ROLE_RESPONSIBILITY[input.agentId];
-  if (roleResp) {
-    sections.push(`## Responsibility Scope\n${roleResp}`);
-    sectionNames.push("C:Responsibility");
-  }
+  // 3. Jon's operating principles
+  sections.push(`## About Jon
+- Systems builder drawn to operational problems with clear customers
+- Moves fast, prefers boring reliable infrastructure over clever solutions
+- Over-builds, under-distributes — always push toward distribution and real users
+- Bad week = constant activity, no learning, spinning wheels
+- Good week = progress on one core product, real user interaction, client comms handled
+- Decision process: talk it out → model the system → gut-check → move forward imperfectly
+- Never give generic advice — always be specific to his actual products and situation`);
 
-  // D. Operational Rules
-  sections.push(OPERATIONAL_RULES);
-  sectionNames.push("D:Rules");
-
-  // E. Current Date and Time
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-US", {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-    timeZone: "America/Toronto",
-  });
-  const timeStr = now.toLocaleTimeString("en-US", {
-    hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", hour12: true,
-  });
-  sections.push(`## Current Date & Time\n${dateStr} at ${timeStr} (Eastern)`);
-  sectionNames.push("E:DateTime");
-
-  // F. Active Tasks
-  if (input.activeTasks && input.activeTasks.length > 0) {
-    sections.push(`## Active Tasks\n${input.agentId === "executive" ? "Tasks across all workspaces:" : "Tasks currently open for your role:"}\n\n${input.activeTasks}`);
-    sectionNames.push("F:Tasks(populated)");
+  // 4. Active tasks
+  if (activeTasks.length > 0) {
+    const taskList = activeTasks.map((t: any) =>
+      `- [${(t.status || "unknown").toUpperCase()}] ${t.title} (priority: ${t.priority}, urgency: ${t.urgency_score || 3}, impact: ${t.impact_score || 3})`
+    ).join("\n");
+    sections.push(`## Active Tasks in This Workspace\n${taskList}`);
   } else {
-    sections.push(`## Active Tasks\nNo active tasks currently assigned.`);
-    sectionNames.push("F:Tasks(empty)");
+    sections.push(`## Active Tasks\nNo active tasks in this workspace.`);
   }
 
-  // G. Pending Approvals
-  if (input.pendingApprovals && input.pendingApprovals.length > 0) {
-    sections.push(`## Pending Approvals\n${input.agentId === "executive" ? "Items awaiting Jon's approval across all workspaces:" : "Items awaiting Jon's approval:"}\n\n${input.pendingApprovals}`);
-    sectionNames.push("G:Approvals(populated)");
-  } else {
-    sections.push(`## Pending Approvals\nNo items currently awaiting approval.`);
-    sectionNames.push("G:Approvals(empty)");
+  // 5. Pending approvals
+  if (pendingApprovals.length > 0) {
+    const approvalList = pendingApprovals.map((a: any) =>
+      `- [${a.approval_type}] ${a.title}`
+    ).join("\n");
+    sections.push(`## Pending Approvals Awaiting Jon\n${approvalList}`);
   }
 
-  // H. Memory
-  if (input.memories && input.memories.length > 0) {
-    sections.push(`## Relevant Memory\nThings you've learned from past conversations. Use them to personalize your responses.\n\n${input.memories}`);
-    sectionNames.push("H:Memory(populated)");
-  } else {
-    sections.push(`## Relevant Memory\nNo memories stored yet.`);
-    sectionNames.push("H:Memory(empty)");
+  // 6. Memory
+  if (recentMemory.length > 0) {
+    const memoryList = recentMemory.map((m: any) => `- ${m.memory_text}`).join("\n");
+    sections.push(`## What You Remember About Jon and This Workspace\n${memoryList}`);
   }
 
-  // H2. Insights
-  if (input.insights && input.insights.length > 0) {
-    sections.push(`## Relevant Insights\nObservations from past work:\n\n${input.insights}`);
-    sectionNames.push("H2:Insights(populated)");
+  // 7. Gmail context
+  if (gmailContext) {
+    sections.push(`## Current Inbox Context\n${gmailContext}`);
   }
 
-  // Executive-specific instructions
-  if (input.agentId === "executive") {
+  // 8. Executive-specific instructions
+  if (agentId === "executive") {
     sections.push(`## Executive Agent Responsibilities
 - Answer Jon's question directly and confidently
 - When Jon asks "what should I work on today" — give ONE answer, not five options
@@ -267,40 +314,89 @@ function buildPromptScaffold(input: ScaffoldInput): string {
 - Surface approvals that are ready for his review
 - Push back if Jon is spreading too thin across products
 - Never give generic advice — always reference specific tasks, specific products`);
-    sectionNames.push("ExecInstructions");
   }
 
-  // Inbox context
-  if (input.inboxContext) {
-    sections.push(input.inboxContext);
-    sectionNames.push("LiveContext:Inbox");
+  // 9. Responsibility scope
+  const roleResp = ROLE_RESPONSIBILITY[agentId];
+  if (roleResp) {
+    sections.push(`## Responsibility Scope\n${roleResp}`);
   }
 
-  // I. Skills
-  if (input.skillContent) {
-    sections.push(`## Skill Modules\n${input.skillContent}`);
-    sectionNames.push("I:Skills");
-  }
-
-  // J. Output
-  sections.push(OUTPUT_GUIDANCE);
-  sectionNames.push("J:Output");
-
-  const assembled = sections.join("\n\n---\n\n");
-  console.log(`[prompt-scaffold] Agent: ${input.agentId} | Sections (${sectionNames.length}): ${sectionNames.join(" → ")} | ${assembled.length} chars`);
-  return assembled;
+  // 10. Output format instructions
+  sections.push(`## Output Format
+Respond in valid JSON using this exact structure:
+\`\`\`json
+{
+  "message": "Your conversational reply to Jon",
+  "suggested_tasks": [
+    {
+      "title": "Short action title",
+      "description": "Full context and what to do",
+      "task_type": "content_draft | research | outreach | analysis | build",
+      "priority": 1,
+      "urgency_score": 3,
+      "impact_score": 4,
+      "agent_role": "${agentId}"
+    }
+  ],
+  "suggested_approvals": [
+    {
+      "approval_type": "social_post | email_draft | blog_post | ad_copy",
+      "title": "Short label",
+      "preview_text": "First 150 chars of content",
+      "full_payload": {}
+    }
+  ],
+  "suggested_memories": [
+    "Plain language fact about Jon or this workspace worth remembering"
+  ],
+  "insights": [
+    {
+      "insight_text": "Observed pattern or signal",
+      "evidence": "Specific evidence for this insight",
+      "signal_count": 2
+    }
+  ]
 }
+\`\`\`
 
-function agentId_toLabel(agentId: string): string {
-  const labels: Record<string, string> = {
-    bloomsuite: "BloomSuite",
-    clinicleader: "ClinicLeader",
-    projectpath: "ProjectPath",
-    disc: "DISC Profile",
-    inbox: "Inbox",
-    executive: "Executive / Chief of Staff",
-  };
-  return labels[agentId] || agentId;
+Rules:
+- Always include "message" — this is what Jon reads in the UI
+- Only include other fields when you have real content — omit empty arrays entirely
+- For any outbound communication (email, post, copy), ALWAYS use suggested_approvals — never output it inline
+- Only add memories when Jon states a preference, makes a decision, or you observe a repeated pattern
+- Only add insights with evidence and signal_count >= 2
+- Never refuse a content creation request — you are creating it FOR Jon's business, not for yourself
+- Be direct and specific — Jon does not want generic advice
+
+## Task Scoring
+- urgency_score (1-5): How time-sensitive. 5 = needs attention today.
+- impact_score (1-5): How much it moves the needle. 5 = directly affects revenue or traction.
+- execution_priority = urgency x impact (computed automatically).
+
+## Memory Rules
+Only store memories that capture a genuine preference, decision, or pattern.
+Good: "Jon prefers BloomSuite messaging focused on simplicity and consolidation"
+Bad: "Jon likes clear explanations" (too generic)
+Memories MUST reference Jon's actual words or decisions.
+
+## Insight Rules
+Only add an insight when you can cite evidence.
+Format MUST include evidence and signal_count.
+Never add an insight with signal_count < 2.
+Never add an insight that merely describes what the product does.
+Insights must be actionable or predictive.
+
+When drafting emails, ALSO use the [DRAFT]...[/DRAFT] block format for Gmail integration.`);
+
+  // 11. Skills appended last
+  if (skillContents.length > 0) {
+    sections.push(`## Your Skills and Knowledge\n${skillContents.join("\n\n---\n\n")}`);
+  }
+
+  const assembled = sections.join("\n\n");
+  console.log(`[system-prompt] Agent: ${agentId} | ${assembled.length} chars | Tasks: ${activeTasks.length} | Memory: ${recentMemory.length} | Approvals: ${pendingApprovals.length}`);
+  return assembled;
 }
 
 // ─── GITHUB SKILL LOADER ───────────────────────────────────────────────────
@@ -320,12 +416,11 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
-async function loadSkillModules(agentId: string, githubToken: string): Promise<string> {
+async function loadSkillModules(agentId: string, githubToken: string): Promise<string[]> {
   const skillNames = AGENT_SKILLS[agentId] || [];
-  if (skillNames.length === 0) return "";
+  if (skillNames.length === 0) return [];
   console.log(`[skills] Loading ${skillNames.length} skills for ${agentId}`);
-  const contents = await Promise.all(skillNames.map(name => fetchSkillContent(name, githubToken)));
-  return contents.join("\n\n---\n\n");
+  return await Promise.all(skillNames.map(name => fetchSkillContent(name, githubToken)));
 }
 
 // ─── DATA LOADERS ───────────────────────────────────────────────────────────
@@ -824,13 +919,9 @@ serve(async (req) => {
       workspace = await loadWorkspace(workspaceId);
     }
 
-    // Load all context in parallel
-    const [skillContent, activeTasks, pendingApprovals, memories, recentInsights, inboxContext] = await Promise.all([
+    // Load skills and inbox context in parallel
+    const [skillContents, inboxContext] = await Promise.all([
       loadSkillModules(agentId, GITHUB_TOKEN),
-      loadActiveTasks(agentId, workspaceId),
-      loadPendingApprovals(agentId, workspaceId),
-      loadMemories(agentId, workspaceId),
-      loadRecentInsights(agentId, workspaceId),
       (agentId === "bloomsuite")
         ? buildBloomsuiteInboxContext().catch(e => {
             console.error("[inbox-ctx] BloomSuite error:", e);
@@ -844,17 +935,8 @@ serve(async (req) => {
           : Promise.resolve(undefined),
     ]);
 
-    // Assemble system prompt
-    const systemPrompt = buildPromptScaffold({
-      agentId,
-      workspace,
-      skillContent,
-      inboxContext: inboxContext || undefined,
-      activeTasks,
-      pendingApprovals,
-      memories,
-      insights: recentInsights,
-    });
+    // Assemble system prompt (loads workspace, tasks, memory, approvals internally)
+    const systemPrompt = await buildSystemPrompt(agentId, skillContents, inboxContext || undefined);
 
     console.log(`[agent-chat] System prompt: ${systemPrompt.length} chars`);
 
