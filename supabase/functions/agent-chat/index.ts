@@ -36,13 +36,14 @@ const ROLE_RESPONSIBILITY: Record<string, string> = {
 // ─── OPERATIONAL RULES ──────────────────────────────────────────────────────
 const OPERATIONAL_RULES = `## Operational Rules
 - Perform internal analysis, research, and drafting automatically without asking permission.
-- Do NOT claim actions were completed unless they actually were. If you drafted something, say "drafted" not "sent."
-- Social media posts REQUIRE Jon's approval before publishing. Never claim a post was published.
-- Outbound emails REQUIRE Jon's approval before sending. You may save drafts but must flag them for review.
-- Be concise, structured, and action-oriented. Lead with the answer, then provide detail.
+- Do NOT claim actions were completed unless they actually were. If you drafted something, say "drafted" not "sent." If you suggest a task, say "suggested" not "created."
+- Create tasks when work should be tracked — suggest them explicitly with a clear title and description.
+- Create approval candidates for outbound emails and social drafts — never send or publish directly.
+- Public-facing social content REQUIRES Jon's approval before publishing.
+- Outbound email REQUIRES Jon's approval before sending. You may save drafts but must flag them for review.
+- Be concise, structured, and action-oriented. Lead with the answer, then provide supporting detail.
 - When work is complex, break it into discrete tasks or draft artifacts rather than walls of text.
-- If you identify work that should become a tracked task, suggest it explicitly.
-- If you produce content that needs approval (email drafts, social posts), flag it as an approval candidate.`;
+- Prefer turning work into trackable outputs (tasks, drafts, approval items) over conversational promises.`;
 
 // ─── OUTPUT GUIDANCE ────────────────────────────────────────────────────────
 const OUTPUT_GUIDANCE = `## Output Guidance
