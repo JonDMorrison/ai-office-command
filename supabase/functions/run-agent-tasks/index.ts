@@ -344,32 +344,36 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
     // Build prompt and call Claude
     const systemPrompt = buildExecutionPrompt(task, workspace, skills, recentMemory);
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    // Call Lovable AI Gateway
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: [{ role: "user", content: `Execute this task: ${task.title}\n\n${task.description || ''}` }],
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: `Execute this task: ${task.title}\n\n${task.description || ''}` },
+        ],
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      console.error(`[run-tasks] Claude API error for task ${task.id}: ${response.status} ${errText}`);
-      await updateTaskStatus(task.id, "failed", `Claude API error: ${response.status}`);
+      console.error(`[run-tasks] AI Gateway error for task ${task.id}: ${response.status} ${errText}`);
+      await updateTaskStatus(task.id, "failed", `AI Gateway error: ${response.status}`);
       result.status = "failed";
-      result.message = `Claude API error: ${response.status}`;
+      result.message = `AI Gateway error: ${response.status}`;
       return result;
     }
 
     const data = await response.json();
-    const fullText = data.content?.[0]?.text || "";
+    const fullText = data.choices?.[0]?.message?.content || "";
     const parsed = parseAgentResponse(fullText);
     
     result.message = parsed.message || fullText.slice(0, 200);
