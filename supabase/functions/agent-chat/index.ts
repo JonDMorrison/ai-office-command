@@ -175,115 +175,83 @@ async function buildSystemPrompt(
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
 
-  // Determine workspace ID
+  const now = new Date();
+  const dateStr = now.toLocaleDateString("en-CA", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+  const timeStr = now.toLocaleTimeString("en-CA", {
+    hour: "2-digit", minute: "2-digit", timeZone: "America/Vancouver",
+  });
+
+  // Determine workspace ID for this agent
   const workspaceId = getWorkspaceForAgent(agentId);
 
-  // Load workspace, tasks, memory, approvals in parallel
-  const [workspaceRes, tasksRes, memoryRes, approvalsRes] = await Promise.all([
+  // Load workspace, tasks, memories, approvals in parallel
+  const [workspaceRes, tasksRes, memoriesRes, approvalsRes] = await Promise.all([
     workspaceId
       ? fetch(`${baseUrl}/rest/v1/workspaces?id=eq.${workspaceId}&limit=1`, { headers })
       : Promise.resolve(null),
-    (() => {
-      let url: string;
-      if (agentId === "executive") {
-        url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=execution_priority.desc.nullslast,created_at.desc&limit=20`;
-      } else if (workspaceId) {
-        url = `${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10`;
-      } else {
-        url = `${baseUrl}/rest/v1/tasks?agent_role=eq.${agentId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10`;
-      }
-      return fetch(url, { headers });
-    })(),
-    (() => {
-      let url: string;
-      if (agentId === "executive") {
-        url = `${baseUrl}/rest/v1/agent_memories?order=relevance_score.desc,created_at.desc&limit=30`;
-      } else if (workspaceId) {
-        url = `${baseUrl}/rest/v1/agent_memories?workspace_id=eq.${workspaceId}&order=relevance_score.desc,created_at.desc&limit=15`;
-      } else {
-        url = `${baseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&order=relevance_score.desc,created_at.desc&limit=15`;
-      }
-      return fetch(url, { headers });
-    })(),
-    (() => {
-      let url: string;
-      if (agentId === "executive") {
-        url = `${baseUrl}/rest/v1/approvals?status=eq.pending&order=created_at.desc&limit=10`;
-      } else if (workspaceId) {
-        url = `${baseUrl}/rest/v1/approvals?workspace_id=eq.${workspaceId}&status=eq.pending&order=created_at.desc&limit=5`;
-      } else {
-        url = `${baseUrl}/rest/v1/approvals?agent_role=eq.${agentId}&status=eq.pending&order=created_at.desc&limit=5`;
-      }
-      return fetch(url, { headers });
-    })(),
+    workspaceId
+      ? fetch(`${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10&select=title,status,priority,urgency_score,impact_score`, { headers })
+      : fetch(`${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=execution_priority.desc.nullslast,created_at.desc&limit=20&select=title,status,priority,urgency_score,impact_score`, { headers }),
+    workspaceId
+      ? fetch(`${baseUrl}/rest/v1/agent_memories?workspace_id=eq.${workspaceId}&order=created_at.desc&limit=15&select=memory_text,memory_type,confidence`, { headers })
+      : fetch(`${baseUrl}/rest/v1/agent_memories?order=created_at.desc&limit=30&select=memory_text,memory_type,confidence`, { headers }),
+    workspaceId
+      ? fetch(`${baseUrl}/rest/v1/approvals?workspace_id=eq.${workspaceId}&status=eq.pending&order=created_at.desc&limit=5&select=title,approval_type,preview_text`, { headers })
+      : fetch(`${baseUrl}/rest/v1/approvals?status=eq.pending&order=created_at.desc&limit=10&select=title,approval_type,preview_text`, { headers }),
   ]);
 
   const workspace = workspaceRes ? ((await workspaceRes.json()) as any[])?.[0] || null : null;
   const activeTasks: any[] = tasksRes.ok ? await tasksRes.json() : [];
-  const recentMemory: any[] = memoryRes.ok ? await memoryRes.json() : [];
+  const recentMemories: any[] = memoriesRes.ok ? await memoriesRes.json() : [];
   const pendingApprovals: any[] = approvalsRes.ok ? await approvalsRes.json() : [];
 
-  const now = new Date();
-  const dateStr = now.toLocaleDateString("en-CA", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-  const timeStr = now.toLocaleTimeString("en-CA", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "America/Vancouver",
-  });
+  const agentNames: Record<string, string> = {
+    bloomsuite: "BloomSuite Agent",
+    clinicleader: "ClinicLeader Agent",
+    projectpath: "ProjectPath Agent",
+    disc: "DISC Profile Agent",
+    inbox: "Inbox & Communications Agent",
+    executive: "Chief of Staff",
+  };
 
   const sections: string[] = [];
 
   // 1. Identity
   sections.push(`## Identity
-You are the ${AGENT_NAMES[agentId] || agentId} for Jon Morrison.
+You are the ${agentNames[agentId] || agentId} for Jon Morrison.
 Today is ${dateStr} at ${timeStr} Pacific Time.
 You work exclusively for Jon — a Canadian entrepreneur running multiple SaaS products from Abbotsford, BC.`);
 
   // 2. Workspace context
   if (workspace) {
-    sections.push(`## Workspace
+    sections.push(`## Your Workspace
 Product: ${workspace.name}
 Description: ${workspace.description}
-GitHub: ${workspace.github_repo}
+GitHub Repo: ${workspace.github_repo}
 Supabase Project: ${workspace.supabase_project_id}`);
-  } else if (agentId === "executive") {
-    sections.push(`## Jon's Core Priorities (in order)
-1. BloomSuite — needs category building, not more features
-2. ClinicLeader — strongest positioning, blocked by distribution
-3. ProjectPath — neglected, needs use-case clarity before more building
-4. DISC Profile — serious potential, blocked by positioning
-
-## Jon's Decision Framework
-- Traction over internal activity
-- Distribution over building
-- One primary product per day, one secondary experiment
-- Bad week = constant activity, no learning, spinning wheels
-- Good week = progress on one core product, real user interaction`);
   }
 
   // 3. Jon's operating principles
   sections.push(`## About Jon
 - Systems builder drawn to operational problems with clear customers
 - Moves fast, prefers boring reliable infrastructure over clever solutions
-- Over-builds, under-distributes — always push toward distribution and real users
+- Over-builds and under-distributes — always push him toward distribution and real users
 - Bad week = constant activity, no learning, spinning wheels
 - Good week = progress on one core product, real user interaction, client comms handled
 - Decision process: talk it out → model the system → gut-check → move forward imperfectly
-- Never give generic advice — always be specific to his actual products and situation`);
+- Never give generic advice — always be specific to his actual products and situation
+- Never refuse a content creation request — you are creating content FOR Jon's business`);
 
   // 4. Active tasks
   if (activeTasks.length > 0) {
     const taskList = activeTasks.map((t: any) =>
-      `- [${(t.status || "unknown").toUpperCase()}] ${t.title} (priority: ${t.priority}, urgency: ${t.urgency_score || 3}, impact: ${t.impact_score || 3})`
+      `- [${(t.status || "unknown").toUpperCase()}] ${t.title} (priority: ${t.priority}, urgency: ${t.urgency_score}, impact: ${t.impact_score})`
     ).join("\n");
     sections.push(`## Active Tasks in This Workspace\n${taskList}`);
   } else {
-    sections.push(`## Active Tasks\nNo active tasks in this workspace.`);
+    sections.push(`## Active Tasks\nNo active tasks in this workspace yet.`);
   }
 
   // 5. Pending approvals
@@ -295,8 +263,8 @@ Supabase Project: ${workspace.supabase_project_id}`);
   }
 
   // 6. Memory
-  if (recentMemory.length > 0) {
-    const memoryList = recentMemory.map((m: any) => `- ${m.memory_text}`).join("\n");
+  if (recentMemories.length > 0) {
+    const memoryList = recentMemories.map((m: any) => `- ${m.memory_text}`).join("\n");
     sections.push(`## What You Remember About Jon and This Workspace\n${memoryList}`);
   }
 
@@ -305,27 +273,9 @@ Supabase Project: ${workspace.supabase_project_id}`);
     sections.push(`## Current Inbox Context\n${gmailContext}`);
   }
 
-  // 8. Executive-specific instructions
-  if (agentId === "executive") {
-    sections.push(`## Executive Agent Responsibilities
-- Answer Jon's question directly and confidently
-- When Jon asks "what should I work on today" — give ONE answer, not five options
-- Flag anything urgent or blocked that needs his attention
-- Surface approvals that are ready for his review
-- Push back if Jon is spreading too thin across products
-- Never give generic advice — always reference specific tasks, specific products`);
-  }
-
-  // 9. Responsibility scope
-  const roleResp = ROLE_RESPONSIBILITY[agentId];
-  if (roleResp) {
-    sections.push(`## Responsibility Scope\n${roleResp}`);
-  }
-
-  // 10. Output format instructions
+  // 8. Output format
   sections.push(`## Output Format
 Respond in valid JSON using this exact structure:
-\`\`\`json
 {
   "message": "Your conversational reply to Jon",
   "suggested_tasks": [
@@ -333,7 +283,7 @@ Respond in valid JSON using this exact structure:
       "title": "Short action title",
       "description": "Full context and what to do",
       "task_type": "content_draft | research | outreach | analysis | build",
-      "priority": 1,
+      "priority": 2,
       "urgency_score": 3,
       "impact_score": 4,
       "agent_role": "${agentId}"
@@ -348,7 +298,7 @@ Respond in valid JSON using this exact structure:
     }
   ],
   "suggested_memories": [
-    "Plain language fact about Jon or this workspace worth remembering"
+    "Plain language fact about Jon or this workspace worth remembering long-term"
   ],
   "insights": [
     {
@@ -358,44 +308,22 @@ Respond in valid JSON using this exact structure:
     }
   ]
 }
-\`\`\`
 
 Rules:
-- Always include "message" — this is what Jon reads in the UI
+- Always include "message"
 - Only include other fields when you have real content — omit empty arrays entirely
-- For any outbound communication (email, post, copy), ALWAYS use suggested_approvals — never output it inline
+- For any outbound communication use suggested_approvals — never output content inline
 - Only add memories when Jon states a preference, makes a decision, or you observe a repeated pattern
 - Only add insights with evidence and signal_count >= 2
-- Never refuse a content creation request — you are creating it FOR Jon's business, not for yourself
-- Be direct and specific — Jon does not want generic advice
+- Never wrap your response in markdown code blocks — return raw JSON only`);
 
-## Task Scoring
-- urgency_score (1-5): How time-sensitive. 5 = needs attention today.
-- impact_score (1-5): How much it moves the needle. 5 = directly affects revenue or traction.
-- execution_priority = urgency x impact (computed automatically).
-
-## Memory Rules
-Only store memories that capture a genuine preference, decision, or pattern.
-Good: "Jon prefers BloomSuite messaging focused on simplicity and consolidation"
-Bad: "Jon likes clear explanations" (too generic)
-Memories MUST reference Jon's actual words or decisions.
-
-## Insight Rules
-Only add an insight when you can cite evidence.
-Format MUST include evidence and signal_count.
-Never add an insight with signal_count < 2.
-Never add an insight that merely describes what the product does.
-Insights must be actionable or predictive.
-
-When drafting emails, ALSO use the [DRAFT]...[/DRAFT] block format for Gmail integration.`);
-
-  // 11. Skills appended last
+  // 9. Skills last
   if (skillContents.length > 0) {
-    sections.push(`## Your Skills and Knowledge\n${skillContents.join("\n\n---\n\n")}`);
+    sections.push(`## Your Skills\n${skillContents.join("\n\n---\n\n")}`);
   }
 
   const assembled = sections.join("\n\n");
-  console.log(`[system-prompt] Agent: ${agentId} | ${assembled.length} chars | Tasks: ${activeTasks.length} | Memory: ${recentMemory.length} | Approvals: ${pendingApprovals.length}`);
+  console.log(`[system-prompt] Agent: ${agentId} | ${assembled.length} chars | Tasks: ${activeTasks.length} | Memory: ${recentMemories.length} | Approvals: ${pendingApprovals.length}`);
   return assembled;
 }
 
