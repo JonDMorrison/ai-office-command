@@ -179,6 +179,7 @@ You speak with authority about clinic operations, leadership structure, and the 
     name: 'ProjectPath',
     role: 'Construction OS Expert',
     product: 'ProjectPath',
+    workspaceId: 'projectpath',
     colorVar: 'agent-project',
     colorHex: '#f59e0b',
     avatar: '🏗️',
