@@ -66,10 +66,10 @@ export function useAgentStates() {
   // ── Poll real data every 8 seconds ──────────────────────────────────────
   const fetchRealStates = useCallback(async () => {
     try {
-      // Fetch active tasks (non-terminal statuses)
+      // Fetch active tasks — use assigned_agent for ownership clarity
       const { data: taskData } = await (supabase
         .from('tasks' as any)
-        .select('agent_role, status, title')
+        .select('agent_role, assigned_agent, status, title')
         .in('status', [
           TASK_STATUS.IN_PROGRESS,
           TASK_STATUS.QUEUED,
