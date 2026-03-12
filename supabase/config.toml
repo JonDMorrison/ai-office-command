@@ -2,3 +2,6 @@ project_id = "wajlvfaoieujdrybtiqh"
 
 [functions.agent-chat]
 verify_jwt = false
+
+[functions.run-agent-tasks]
+verify_jwt = false
