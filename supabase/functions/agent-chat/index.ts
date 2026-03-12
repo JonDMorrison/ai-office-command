@@ -81,7 +81,7 @@ Format (only include arrays that have items):
     { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "urgency_score": 4, "impact_score": 5 }
   ],
   "suggested_approvals": [
-    { "approval_type": "social_post|email_draft|public_content", "title": "What Jon sees", "preview_text": "The full draft content", "platform": "linkedin" }
+    { "approval_type": "social_post|email_draft|public_content", "title": "Clear descriptive title of the deliverable", "preview_text": "A short summary of what this is", "content": "The FULL text of the email/post/draft — this is what Jon will review", "platform": "linkedin" }
   ],
   "suggested_memories": [
     "Jon prefers short punchy LinkedIn posts without emojis"
@@ -329,9 +329,9 @@ Respond in valid JSON using this exact structure:
   "suggested_approvals": [
     {
       "approval_type": "social_post | email_draft | blog_post | ad_copy",
-      "title": "Short label",
-      "preview_text": "First 150 chars of content",
-      "full_payload": {}
+      "title": "Clear descriptive title of the deliverable",
+      "preview_text": "Short summary of what this is and why",
+      "content": "The FULL deliverable text that Jon will review — the actual email body, social post, blog draft, etc."
     }
   ],
   "delegate_to": [
@@ -631,7 +631,7 @@ async function buildInboxAgentContext(): Promise<string> {
 
 interface ParsedArtifacts {
   suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number; agent_role?: string; parent_task_id?: string; input_payload?: Record<string, unknown> }>;
-  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string; full_payload?: Record<string, unknown> }>;
+  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; content?: string; platform?: string; full_payload?: Record<string, unknown> }>;
   delegate_to?: Array<{ agent_role: string; title: string; description?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_memories?: string[];
   insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
@@ -793,6 +793,12 @@ async function processAgentArtifacts(
   // --- APPROVALS ---
   if (parsed.suggested_approvals?.length) {
     for (const approval of parsed.suggested_approvals) {
+      const approvalTitle = (approval.title && approval.title !== "Untitled" ? approval.title : "Draft from " + agentId).slice(0, 120);
+      const approvalPreview = approval.preview_text || approval.content?.slice(0, 300) || "";
+      const approvalPayload = approval.full_payload && Object.keys(approval.full_payload).length > 0
+        ? approval.full_payload
+        : { content: approval.content || approval.preview_text || null, platform: approval.platform || null, agent: agentId };
+
       const res = await fetch(`${baseUrl}/rest/v1/approvals`, {
         method: "POST",
         headers,
@@ -800,9 +806,9 @@ async function processAgentArtifacts(
           workspace_id: workspaceId,
           agent_role: agentId,
           approval_type: approval.approval_type || "general",
-          title: approval.title || "Untitled",
-          preview_text: (approval.preview_text || "").slice(0, 150),
-          full_payload: approval.full_payload || {},
+          title: approvalTitle,
+          preview_text: approvalPreview.slice(0, 300),
+          full_payload: approvalPayload,
           status: "pending",
         }),
       });

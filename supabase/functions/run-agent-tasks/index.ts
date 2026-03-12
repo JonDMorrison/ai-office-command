@@ -57,7 +57,7 @@ interface ParsedArtifacts {
   message?: string;
   output?: string;
   suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
-  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string }>;
+  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; content?: string; platform?: string }>;
   delegate_to?: Array<{ agent_role: string; title: string; description?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_memories?: string[];
   insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
@@ -263,7 +263,7 @@ Respond with a JSON block:
   "message": "Summary of what you did",
   "output": "The actual deliverable content if applicable",
   "suggested_tasks": [{ "title": "...", "urgency_score": 4, "impact_score": 5 }],
-  "suggested_approvals": [],
+  "suggested_approvals": [{ "approval_type": "email_draft|social_post|blog_post|ad_copy|general", "title": "Clear descriptive title of the deliverable", "preview_text": "A short summary of what this is and why it matters", "content": "The FULL deliverable text — the actual email body, social post, blog draft, etc." }],
   "delegate_to": [{ "agent_role": "bloomsuite", "title": "...", "description": "...", "urgency_score": 3, "impact_score": 4 }],
   "suggested_memories": ["Jon prefers..."],
   "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
@@ -485,9 +485,14 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         workspace_id: workspaceId,
         agent_role: task.agent_role,
         approval_type: a.approval_type || "general",
-        title: a.title || "Untitled",
-        preview_text: a.preview_text || null,
-        full_payload: { platform: a.platform },
+        title: (a.title && a.title !== "Untitled" ? a.title : parsed.message?.slice(0, 80) || task.title).slice(0, 120),
+        preview_text: a.preview_text || a.content?.slice(0, 300) || parsed.output?.slice(0, 300) || parsed.message?.slice(0, 300) || null,
+        full_payload: {
+          platform: a.platform || null,
+          content: a.content || parsed.output || null,
+          source_task: task.title,
+          agent: task.agent_role,
+        },
         status: "pending",
       }))),
       insertBatch("agent_memories", memoryRows),
