@@ -55,6 +55,7 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals
               </span>
             )}
           </button>
+        )}
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-agent-bloom animate-status-pulse" />
           <span className="text-foreground font-medium">{activeCount} active</span>
