@@ -542,10 +542,10 @@ async function buildInboxAgentContext(): Promise<string> {
 // ─── ARTIFACT EXTRACTION & PROCESSING ───────────────────────────────────────
 
 interface ParsedArtifacts {
-  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number }>;
+  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string; full_payload?: Record<string, unknown> }>;
   suggested_memories?: string[];
-  insights?: string[];
+  insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
 }
 
 interface ArtifactCounts {
@@ -574,6 +574,74 @@ function extractArtifacts(fullText: string): { message: string; artifacts: Parse
   }
 }
 
+// ─── GUARDRAIL: Memory quality gate ─────────────────────────────────────────
+
+const MEMORY_TRIGGER_PHRASES = [
+  "jon prefers", "jon wants", "jon decided", "jon always",
+  "jon never", "we agreed", "going forward", "jon said",
+  "jon likes", "jon dislikes", "jon chose", "the strategy is",
+];
+
+function shouldStoreMemory(memoryText: string): boolean {
+  const text = memoryText.toLowerCase();
+  const hasSignal = MEMORY_TRIGGER_PHRASES.some(p => text.includes(p));
+  const isGeneric = text.includes("likes clear") ||
+    text.includes("prefers good") ||
+    text.includes("wants quality") ||
+    text.length < 20;
+  if (!hasSignal) console.log(`[memory-gate] REJECTED (no signal): "${memoryText.slice(0, 80)}"`);
+  if (isGeneric) console.log(`[memory-gate] REJECTED (generic): "${memoryText.slice(0, 80)}"`);
+  return hasSignal && !isGeneric;
+}
+
+// ─── GUARDRAIL: Task deduplication ──────────────────────────────────────────
+
+async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  
+  let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&limit=20`;
+  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+  
+  const res = await fetch(url, { headers });
+  if (!res.ok) return null;
+  const tasks = await res.json();
+  
+  const words = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
+  return tasks?.find((t: any) =>
+    words.filter((word: string) => t.title.toLowerCase().includes(word)).length >= 2
+  ) || null;
+}
+
+// ─── GUARDRAIL: Insight evidence filter ─────────────────────────────────────
+
+function parseInsight(raw: string | { insight_text: string; evidence?: string; signal_count?: number }): {
+  insight_text: string; evidence: string | null; signal_count: number;
+} {
+  if (typeof raw === "string") {
+    return { insight_text: raw, evidence: null, signal_count: 1 };
+  }
+  return {
+    insight_text: raw.insight_text,
+    evidence: raw.evidence || null,
+    signal_count: raw.signal_count || 1,
+  };
+}
+
+function shouldStoreInsight(parsed: { evidence: string | null; signal_count: number }): boolean {
+  if (!parsed.evidence || parsed.evidence.length < 5) {
+    console.log(`[insight-gate] REJECTED (no evidence)`);
+    return false;
+  }
+  if (parsed.signal_count < 2) {
+    console.log(`[insight-gate] REJECTED (signal_count < 2)`);
+    return false;
+  }
+  return true;
+}
+
+// ─── ARTIFACT PROCESSING WITH GUARDRAILS ────────────────────────────────────
+
 async function processArtifacts(agentId: string, workspaceId: string | null, artifacts: ParsedArtifacts | null): Promise<ArtifactCounts> {
   const counts: ArtifactCounts = { tasks: 0, approvals: 0, memories: 0, insights: 0 };
   if (!artifacts) return counts;
@@ -599,17 +667,66 @@ async function processArtifacts(agentId: string, workspaceId: string | null, art
     return rows.length;
   };
 
-  const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
-    insertBatch("tasks", (artifacts.suggested_tasks || []).map(t => ({
+  // --- TASKS: deduplication + depth 0 for chat-created tasks ---
+  const taskRows: Record<string, unknown>[] = [];
+  for (const t of artifacts.suggested_tasks || []) {
+    const similar = await findSimilarActiveTask(workspaceId, t.title || "");
+    if (similar) {
+      console.log(`[task-dedup] Skipping "${t.title}" — similar to existing "${similar.title}"`);
+      // Append note to existing task
+      await fetch(`${baseUrl}/rest/v1/task_events`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          task_id: similar.id,
+          event_type: "agent_note",
+          event_payload: { note: `${agentId} suggested similar work: "${t.title}"` },
+        }),
+      });
+    } else {
+      taskRows.push({
+        workspace_id: workspaceId,
+        agent_role: agentId,
+        title: (t.title || "Untitled").slice(0, 120),
+        description: t.description || null,
+        task_type: t.task_type || "general",
+        urgency_score: t.urgency_score || 3,
+        impact_score: t.impact_score || 3,
+        status: "queued",
+        source: "agent_output",
+        depth: 0,
+        created_by: "agent",
+      });
+    }
+  }
+
+  // --- MEMORIES: quality gate ---
+  const memoryRows = (artifacts.suggested_memories || [])
+    .filter(m => shouldStoreMemory(m))
+    .map(m => ({
       workspace_id: workspaceId,
       agent_role: agentId,
-      title: (t.title || "Untitled").slice(0, 120),
-      description: t.description || null,
-      task_type: t.task_type || "general",
-      priority: t.priority || 3,
-      status: "queued",
-      source: "agent_output",
-    }))),
+      memory_text: m,
+      memory_type: "preference",
+      source: "conversation",
+      confidence: "medium",
+    }));
+
+  // --- INSIGHTS: evidence filter ---
+  const insightRows = (artifacts.insights || [])
+    .map(parseInsight)
+    .filter(shouldStoreInsight)
+    .map(ins => ({
+      workspace_id: workspaceId,
+      agent_role: agentId,
+      insight_text: ins.insight_text,
+      evidence: ins.evidence,
+      signal_count: ins.signal_count,
+      category: "general",
+    }));
+
+  const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+    insertBatch("tasks", taskRows),
     insertBatch("approvals", (artifacts.suggested_approvals || []).map(a => ({
       workspace_id: workspaceId,
       agent_role: agentId,
@@ -619,19 +736,8 @@ async function processArtifacts(agentId: string, workspaceId: string | null, art
       full_payload: a.full_payload || { platform: a.platform },
       status: "pending",
     }))),
-    insertBatch("agent_memories", (artifacts.suggested_memories || []).map(m => ({
-      workspace_id: workspaceId,
-      agent_role: agentId,
-      memory_text: m,
-      memory_type: "preference",
-      source: "conversation",
-    }))),
-    insertBatch("agent_insights", (artifacts.insights || []).map(i => ({
-      workspace_id: workspaceId,
-      agent_role: agentId,
-      insight_text: i,
-      category: "general",
-    }))),
+    insertBatch("agent_memories", memoryRows),
+    insertBatch("agent_insights", insightRows),
   ]);
 
   counts.tasks = taskCount;
