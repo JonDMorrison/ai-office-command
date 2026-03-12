@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { TASK_STATUS, COMPANY_ID, type TaskStatus } from '@/lib/constants';
 
 export interface Task {
   id: string;
@@ -8,7 +9,7 @@ export interface Task {
   title: string;
   description: string | null;
   task_type: string;
-  status: string;
+  status: TaskStatus;
   priority: number;
   requires_approval: boolean;
   source: string;
@@ -18,8 +19,6 @@ export interface Task {
   updated_at: string;
   completed_at: string | null;
 }
-
-const COMPANY_ID = 'joncoach'; // Single-tenant for now
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
