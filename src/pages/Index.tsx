@@ -49,13 +49,14 @@ const Index = () => {
   }, [selectedAgentId]);
 
   // Desk positions: U-shape layout
+  // Desk positions: U-shape with executive centered and elevated
   const deskPositions = [
-    { top: '6%', left: '8%' },
-    { top: '6%', left: '50%', transform: 'translateX(-50%)' },
-    { top: '6%', right: '8%' },
-    { top: '50%', left: '10%' },
-    { top: '50%', left: '50%', transform: 'translateX(-50%)' },
-    { top: '50%', right: '10%' },
+    { top: '6%', left: '8%' },       // bloomsuite
+    { top: '6%', left: '50%', transform: 'translateX(-50%)' },  // clinicleader
+    { top: '6%', right: '8%' },      // projectpath
+    { top: '54%', left: '10%' },     // disc
+    { top: '54%', right: '10%' },    // inbox
+    { top: '48%', left: '50%', transform: 'translateX(-50%)' }, // executive — centered, slightly higher
   ];
 
   return (
