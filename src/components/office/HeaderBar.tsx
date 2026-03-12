@@ -43,6 +43,18 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals
             ☀️ Daily Standup
           </button>
         )}
+        {onOpenApprovals && (
+          <button
+            onClick={onOpenApprovals}
+            className="relative px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-accent hover:shadow-sm transition-all"
+          >
+            📋 Approvals
+            {pendingApprovals > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                {pendingApprovals}
+              </span>
+            )}
+          </button>
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-agent-bloom animate-status-pulse" />
           <span className="text-foreground font-medium">{activeCount} active</span>
