@@ -13,6 +13,7 @@ interface ApprovedPost {
   full_payload: Record<string, unknown>;
   approved_at: string | null;
   workspace_id: string;
+  image_url: string | null;
 }
 
 const ReadyToPost = () => {
@@ -43,6 +44,15 @@ const ReadyToPost = () => {
   }, []);
 
   useEffect(() => { fetchPosts(); }, [fetchPosts]);
+
+  // Seed generatedImages from any existing image_url on load
+  useEffect(() => {
+    const existing: Record<string, string> = {};
+    posts.forEach(p => { if (p.image_url) existing[p.id] = p.image_url; });
+    if (Object.keys(existing).length > 0) {
+      setGeneratedImages(prev => ({ ...existing, ...prev }));
+    }
+  }, [posts]);
 
   const getPostContent = (post: ApprovedPost): string => {
     const payload = post.full_payload as any;
