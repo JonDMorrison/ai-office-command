@@ -219,6 +219,7 @@ export type Database = {
           full_payload: Json
           id: string
           image_url: string | null
+          make_posted_at: string | null
           posted_at: string | null
           preview_text: string | null
           rejected_at: string | null
@@ -236,6 +237,7 @@ export type Database = {
           full_payload?: Json
           id?: string
           image_url?: string | null
+          make_posted_at?: string | null
           posted_at?: string | null
           preview_text?: string | null
           rejected_at?: string | null
@@ -253,6 +255,7 @@ export type Database = {
           full_payload?: Json
           id?: string
           image_url?: string | null
+          make_posted_at?: string | null
           posted_at?: string | null
           preview_text?: string | null
           rejected_at?: string | null
