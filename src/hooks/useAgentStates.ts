@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { agents } from '@/data/agents';
+import { TASK_STATUS } from '@/lib/constants';
 
-export type DynamicState = 'typing' | 'reading' | 'idle' | 'waiting';
+export type DynamicState = 'idle' | 'working' | 'waiting' | 'blocked' | 'needs_input';
 
 export interface AgentDynamicState {
   agentId: string;
@@ -9,10 +11,40 @@ export interface AgentDynamicState {
   taskIndex: number;
   bobOffset: number;
   blinkOn: boolean;
-  standupOverride?: string; // e.g. "Working on it..."
+  standupOverride?: string;
+  activeTaskTitle?: string;
 }
 
-const STATES: DynamicState[] = ['typing', 'reading', 'idle', 'waiting'];
+/**
+ * Derives agent visual state from real task + approval data.
+ *
+ * Priority (highest wins):
+ *   blocked        → any task with status = blocked
+ *   needs_input    → any task with status = waiting_for_input
+ *   waiting        → any pending approval for this agent
+ *   working        → any task with status = in_progress OR queued
+ *   idle           → nothing active
+ */
+function deriveState(
+  agentId: string,
+  tasksByAgent: Record<string, Array<{ status: string; title: string }>>,
+  pendingApprovalAgents: Set<string>,
+): { state: DynamicState; activeTaskTitle?: string } {
+  const tasks = tasksByAgent[agentId] || [];
+
+  const blocked = tasks.find(t => t.status === TASK_STATUS.BLOCKED);
+  if (blocked) return { state: 'blocked', activeTaskTitle: blocked.title };
+
+  const needsInput = tasks.find(t => t.status === TASK_STATUS.WAITING_FOR_INPUT);
+  if (needsInput) return { state: 'needs_input', activeTaskTitle: needsInput.title };
+
+  if (pendingApprovalAgents.has(agentId)) return { state: 'waiting' };
+
+  const working = tasks.find(t => t.status === TASK_STATUS.IN_PROGRESS || t.status === TASK_STATUS.QUEUED);
+  if (working) return { state: 'working', activeTaskTitle: working.title };
+
+  return { state: 'idle' };
+}
 
 export function useAgentStates() {
   const [states, setStates] = useState<Record<string, AgentDynamicState>>(() => {
@@ -20,7 +52,7 @@ export function useAgentStates() {
     agents.forEach(agent => {
       initial[agent.id] = {
         agentId: agent.id,
-        state: 'typing',
+        state: 'idle',
         taskIndex: 0,
         bobOffset: 0,
         blinkOn: true,
@@ -29,25 +61,87 @@ export function useAgentStates() {
     return initial;
   });
 
-  useEffect(() => {
-    const intervals: ReturnType<typeof setInterval>[] = [];
+  const overridesRef = useRef<Record<string, { text: string; expiry: number }>>({});
 
-    agents.forEach(agent => {
-      const stateInterval = setInterval(() => {
-        const newState = STATES[Math.floor(Math.random() * STATES.length)];
-        setStates(prev => ({
-          ...prev,
-          [agent.id]: {
+  // ── Poll real data every 8 seconds ──────────────────────────────────────
+  const fetchRealStates = useCallback(async () => {
+    try {
+      // Fetch active tasks (non-terminal statuses)
+      const { data: taskData } = await (supabase
+        .from('tasks' as any)
+        .select('agent_role, status, title')
+        .in('status', [
+          TASK_STATUS.IN_PROGRESS,
+          TASK_STATUS.QUEUED,
+          TASK_STATUS.PENDING,
+          TASK_STATUS.BLOCKED,
+          TASK_STATUS.WAITING_FOR_INPUT,
+        ]) as any);
+
+      // Fetch pending approvals
+      const { data: approvalData } = await (supabase
+        .from('approvals' as any)
+        .select('agent_role')
+        .eq('status', 'pending') as any);
+
+      const tasksByAgent: Record<string, Array<{ status: string; title: string }>> = {};
+      for (const t of (taskData || []) as Array<{ agent_role: string; status: string; title: string }>) {
+        if (!tasksByAgent[t.agent_role]) tasksByAgent[t.agent_role] = [];
+        tasksByAgent[t.agent_role].push(t);
+      }
+
+      const pendingApprovalAgents = new Set<string>(
+        ((approvalData || []) as Array<{ agent_role: string }>).map(a => a.agent_role)
+      );
+
+      const now = Date.now();
+
+      setStates(prev => {
+        const next = { ...prev };
+        agents.forEach(agent => {
+          // Check for active standup override
+          const override = overridesRef.current[agent.id];
+          if (override && override.expiry > now) {
+            next[agent.id] = {
+              ...prev[agent.id],
+              state: 'working',
+              standupOverride: override.text,
+            };
+            return;
+          } else if (override) {
+            delete overridesRef.current[agent.id];
+          }
+
+          const { state, activeTaskTitle } = deriveState(agent.id, tasksByAgent, pendingApprovalAgents);
+          next[agent.id] = {
             ...prev[agent.id],
-            state: newState,
-            taskIndex: (newState === 'typing' || newState === 'reading')
+            state,
+            standupOverride: undefined,
+            activeTaskTitle,
+            // Rotate taskIndex when working
+            taskIndex: state === 'working'
               ? (prev[agent.id].taskIndex + 1) % agent.tasks.length
               : prev[agent.id].taskIndex,
-          },
-        }));
-      }, 2500 + Math.random() * 2000);
+          };
+        });
+        return next;
+      });
+    } catch (err) {
+      console.error('[useAgentStates] poll error:', err);
+    }
+  }, []);
 
-      const bobInterval = setInterval(() => {
+  useEffect(() => {
+    // Initial fetch
+    fetchRealStates();
+
+    // Poll interval
+    const pollId = setInterval(fetchRealStates, 8000);
+
+    // Idle-float bob animation (purely cosmetic — keep local)
+    const bobIntervals: ReturnType<typeof setInterval>[] = [];
+    agents.forEach(agent => {
+      const id = setInterval(() => {
         setStates(prev => ({
           ...prev,
           [agent.id]: {
@@ -56,49 +150,34 @@ export function useAgentStates() {
           },
         }));
       }, 600 + Math.random() * 400);
-
-      const blinkInterval = setInterval(() => {
-        setStates(prev => ({
-          ...prev,
-          [agent.id]: {
-            ...prev[agent.id],
-            blinkOn: !prev[agent.id].blinkOn,
-          },
-        }));
-      }, 3000 + Math.random() * 2000);
-
-      intervals.push(stateInterval, bobInterval, blinkInterval);
+      bobIntervals.push(id);
     });
 
-    return () => intervals.forEach(clearInterval);
-  }, []);
+    return () => {
+      clearInterval(pollId);
+      bobIntervals.forEach(clearInterval);
+    };
+  }, [fetchRealStates]);
 
   const setStandupOverrides = useCallback((approvedIds: string[]) => {
+    const expiry = Date.now() + 15000;
+    approvedIds.forEach(id => {
+      overridesRef.current[id] = { text: 'Working on it...', expiry };
+    });
+    // Trigger immediate state update
     setStates(prev => {
       const next = { ...prev };
       approvedIds.forEach(id => {
         if (next[id]) {
-          next[id] = { ...next[id], state: 'typing', standupOverride: 'Working on it...' };
+          next[id] = { ...next[id], state: 'working', standupOverride: 'Working on it...' };
         }
       });
       return next;
     });
-    // Clear overrides after 15 seconds
-    setTimeout(() => {
-      setStates(prev => {
-        const next = { ...prev };
-        approvedIds.forEach(id => {
-          if (next[id]) {
-            next[id] = { ...next[id], standupOverride: undefined };
-          }
-        });
-        return next;
-      });
-    }, 15000);
   }, []);
 
-  const activeCount = Object.values(states).filter(s => s.state === 'typing' || s.state === 'reading').length;
-  const waitingCount = Object.values(states).filter(s => s.state === 'waiting').length;
+  const activeCount = Object.values(states).filter(s => s.state === 'working').length;
+  const waitingCount = Object.values(states).filter(s => s.state === 'waiting' || s.state === 'needs_input').length;
 
-  return { states, activeCount, waitingCount, setStandupOverrides };
+  return { states, activeCount, waitingCount, setStandupOverrides, refetch: fetchRealStates };
 }

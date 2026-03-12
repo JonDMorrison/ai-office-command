@@ -213,14 +213,16 @@ const FortniteCharacter = ({ agentId }: { agentId: string }) => {
 
 const getBubbleStyle = (state: string) => {
   switch (state) {
+    case 'working':
+      return { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working' };
     case 'waiting':
-      return { bg: '#fffbeb', border: '#f59e0b', label: '💬 Needs your input' };
+      return { bg: '#fffbeb', border: '#f59e0b', label: '✋ Awaiting Approval' };
+    case 'needs_input':
+      return { bg: '#fef2f2', border: '#ef4444', label: '💬 Needs Your Input' };
+    case 'blocked':
+      return { bg: '#fef2f2', border: '#dc2626', label: '🚫 Blocked' };
     case 'idle':
       return { bg: '#f9fafb', border: '#9ca3af', label: '• Idle' };
-    case 'typing':
-      return { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working' };
-    case 'reading':
-      return { bg: '#eff6ff', border: '#3b82f6', label: '◉ Reading' };
     default:
       return { bg: '#f9fafb', border: '#9ca3af', label: state };
   }
