@@ -9,8 +9,9 @@ const FALLBACK_SUGGESTIONS: Record<string, string> = {
   bloomsuite: "Spring is coming — time to launch the seasonal campaign. Want me to draft the email series?",
   clinicleader: "You haven't posted about ClinicLeader in 3 weeks. Want me to draft a LinkedIn post?",
   projectpath: "ProjectPath has 2 features half-built. Want me to write a prioritization summary?",
-  discprofile: "Your DISC app has no public content. Want me to create a sample team report to share?",
+  disc: "Your DISC app has no public content. Want me to create a sample team report to share?",
   inbox: "You have unread emails across both accounts. Want me to triage and draft replies?",
+  executive: "Let me review what's happening across all your products and recommend today's focus.",
 };
 
 const MEETING_POSITIONS = [
