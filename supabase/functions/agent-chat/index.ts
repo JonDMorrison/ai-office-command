@@ -915,7 +915,7 @@ async function processAgentArtifacts(
   return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated, delegationsCreated };
 }
 
-async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }, parseSuccess: boolean) {
+async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number; delegationsCreated: number }, parseSuccess: boolean) {
   try {
     const baseUrl = getSupabaseUrl();
     const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
