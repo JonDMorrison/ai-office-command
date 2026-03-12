@@ -219,7 +219,7 @@ const ReadyToPost = () => {
                   {imageBase64 && (
                     <div className="mb-3 rounded-lg overflow-hidden bg-muted aspect-square">
                       <img
-                        src={`data:image/png;base64,${imageBase64}`}
+                        src={imageBase64}
                         alt="Generated post image"
                         className="w-full h-full object-cover"
                       />
