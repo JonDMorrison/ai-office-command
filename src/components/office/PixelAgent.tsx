@@ -213,14 +213,16 @@ const FortniteCharacter = ({ agentId }: { agentId: string }) => {
 
 const getBubbleStyle = (state: string) => {
   switch (state) {
+    case 'working':
+      return { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working' };
     case 'waiting':
-      return { bg: '#fffbeb', border: '#f59e0b', label: '💬 Needs your input' };
+      return { bg: '#fffbeb', border: '#f59e0b', label: '✋ Awaiting Approval' };
+    case 'needs_input':
+      return { bg: '#fef2f2', border: '#ef4444', label: '💬 Needs Your Input' };
+    case 'blocked':
+      return { bg: '#fef2f2', border: '#dc2626', label: '🚫 Blocked' };
     case 'idle':
       return { bg: '#f9fafb', border: '#9ca3af', label: '• Idle' };
-    case 'typing':
-      return { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working' };
-    case 'reading':
-      return { bg: '#eff6ff', border: '#3b82f6', label: '◉ Reading' };
     default:
       return { bg: '#f9fafb', border: '#9ca3af', label: state };
   }
@@ -235,15 +237,13 @@ interface PixelAgentProps {
 }
 
 const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = false }: PixelAgentProps) => {
-  const { state, taskIndex, standupOverride } = dynamicState;
-  const isTyping = state === 'typing';
-  const isReading = state === 'reading';
-  const isActive = isTyping || isReading;
+  const { state, taskIndex, standupOverride, activeTaskTitle } = dynamicState;
+  const isActive = state === 'working' || state === 'needs_input' || state === 'blocked';
 
   const bubble = standupOverride
     ? { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working on it...' }
     : getBubbleStyle(state);
-  const showTaskText = !standupOverride && (isTyping || isReading);
+  const showTaskText = !standupOverride && isActive && activeTaskTitle;
 
   return (
     <div
@@ -276,7 +276,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         </div>
         {showTaskText && (
           <div className="mt-1 truncate" style={{ fontSize: '10px', fontWeight: 400, color: '#555', textAlign: 'center' }}>
-            {agent.tasks[taskIndex]}
+            {activeTaskTitle || agent.tasks[taskIndex]}
           </div>
         )}
         <div
