@@ -100,13 +100,13 @@ export function useTasks() {
       if (status === 'completed') updates.completed_at = new Date().toISOString();
 
       const { error } = await (supabase
-        .from('tasks')
+        .from('tasks' as any)
         .update(updates as any)
-        .eq('id', taskId));
+        .eq('id', taskId) as any);
 
       if (error) throw error;
 
-      await (supabase.from('task_events').insert({
+      await (supabase.from('task_events' as any).insert({
         task_id: taskId,
         event_type: 'status_changed',
         event_payload: { new_status: status },
