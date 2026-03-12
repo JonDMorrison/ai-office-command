@@ -747,7 +747,7 @@ async function processAgentArtifacts(
       }
 
       // Collision detection — check for similar active tasks
-      const similar = await findSimilarActiveTask(workspaceId, task.title || "");
+      const similar = await findSimilarActiveTask(workspaceId, task.title || "", task.agent_role || agentId);
 
       if (similar) {
         console.log(`[task-dedup] Skipping "${task.title}" — similar to "${similar.title}"`);
