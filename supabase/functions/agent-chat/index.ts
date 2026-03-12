@@ -309,6 +309,15 @@ Respond in valid JSON using this exact structure:
       "full_payload": {}
     }
   ],
+  "delegate_to": [
+    {
+      "agent_role": "bloomsuite",
+      "title": "Short task title for the other agent",
+      "description": "Full context so the receiving agent can execute independently",
+      "urgency_score": 3,
+      "impact_score": 4
+    }
+  ],
   "suggested_memories": [
     "Plain language fact about Jon or this workspace worth remembering long-term"
   ],
@@ -325,6 +334,8 @@ Rules:
 - Always include "message"
 - Only include other fields when you have real content — omit empty arrays entirely
 - For any outbound communication use suggested_approvals — never output content inline
+- Use delegate_to when work belongs to a DIFFERENT agent's workspace (bloomsuite, clinicleader, projectpath, disc, inbox, executive)
+- Do NOT delegate to yourself — use suggested_tasks for your own workspace
 - Only add memories when Jon states a preference, makes a decision, or you observe a repeated pattern
 - Only add insights with evidence and signal_count >= 2
 - Never wrap your response in markdown code blocks — return raw JSON only`);
@@ -594,8 +605,9 @@ async function buildInboxAgentContext(): Promise<string> {
 // ─── ARTIFACT EXTRACTION & PROCESSING ───────────────────────────────────────
 
 interface ParsedArtifacts {
-  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
+  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number; agent_role?: string; parent_task_id?: string; input_payload?: Record<string, unknown> }>;
   suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string; full_payload?: Record<string, unknown> }>;
+  delegate_to?: Array<{ agent_role: string; title: string; description?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_memories?: string[];
   insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
 }
@@ -685,12 +697,13 @@ async function processAgentArtifacts(
   parsed: any,
   agentId: string,
   workspaceId: string | null
-): Promise<{ tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }> {
+): Promise<{ tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number; delegationsCreated: number }> {
 
   let tasksCreated = 0;
   let approvalsCreated = 0;
   let memoriesCreated = 0;
   let insightsCreated = 0;
+  let delegationsCreated = 0;
 
   const baseUrl = getSupabaseUrl();
   const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
@@ -839,11 +852,71 @@ async function processAgentArtifacts(
     }
   }
 
-  console.log(`[artifacts] Created: ${tasksCreated} tasks, ${approvalsCreated} approvals, ${memoriesCreated} memories, ${insightsCreated} insights`);
-  return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated };
+  // --- DELEGATIONS: create tasks in another agent's workspace ---
+  if (parsed.delegate_to?.length) {
+    const validAgents = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
+    for (const delegation of parsed.delegate_to) {
+      const targetAgent = delegation.agent_role;
+      if (!targetAgent || targetAgent === agentId) {
+        console.log(`[delegation] Rejected self-delegation or missing agent_role: "${delegation.title}"`);
+        continue;
+      }
+      if (!validAgents.includes(targetAgent)) {
+        console.log(`[delegation] Rejected unknown agent_role "${targetAgent}": "${delegation.title}"`);
+        continue;
+      }
+
+      const targetWorkspace = getWorkspaceForAgent(targetAgent);
+
+      // Collision detection in target workspace
+      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "");
+      if (similar) {
+        console.log(`[delegation-dedup] Skipping "${delegation.title}" → ${targetAgent} — similar to "${similar.title}"`);
+        await fetch(`${baseUrl}/rest/v1/task_events`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task_id: similar.id,
+            event_type: "agent_note",
+            event_payload: { note: `Delegated from ${agentId}: "${delegation.title}"` },
+          }),
+        });
+        continue;
+      }
+
+      const res = await fetch(`${baseUrl}/rest/v1/tasks`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workspace_id: targetWorkspace,
+          agent_role: targetAgent,
+          title: (delegation.title || "Delegated task").slice(0, 120),
+          description: delegation.description || `Delegated from ${agentId}`,
+          status: "pending",
+          priority: delegation.priority || 2,
+          urgency_score: delegation.urgency_score || 3,
+          impact_score: delegation.impact_score || 3,
+          depth: 0,
+          created_by: "agent",
+          source: "delegation",
+          input_payload: { delegated_from: agentId, original_workspace: workspaceId },
+        }),
+      });
+
+      if (res.ok) {
+        delegationsCreated++;
+        console.log(`[delegation] ${agentId} → ${targetAgent}: "${delegation.title}"`);
+      } else {
+        console.error("[delegation-insert]", res.status, await res.text());
+      }
+    }
+  }
+
+  console.log(`[artifacts] Created: ${tasksCreated} tasks, ${approvalsCreated} approvals, ${memoriesCreated} memories, ${insightsCreated} insights, ${delegationsCreated} delegations`);
+  return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated, delegationsCreated };
 }
 
-async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }, parseSuccess: boolean) {
+async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number; delegationsCreated: number }, parseSuccess: boolean) {
   try {
     const baseUrl = getSupabaseUrl();
     const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
@@ -981,6 +1054,7 @@ serve(async (req) => {
         approvalsCreated: artifactCounts.approvalsCreated,
         memoriesCreated: artifactCounts.memoriesCreated,
         insightsCreated: artifactCounts.insightsCreated,
+        delegationsCreated: artifactCounts.delegationsCreated,
         raw: parsedResponse,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

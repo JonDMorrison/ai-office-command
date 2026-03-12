@@ -15,7 +15,7 @@ interface ChatPanelProps {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
-  artifacts?: { tasks: number; approvals: number; memories: number; insights: number };
+  artifacts?: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
 }
 
 const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps) => {
@@ -71,6 +71,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
         approvals: data.approvalsCreated || 0,
         memories: data.memoriesCreated || 0,
         insights: data.insightsCreated || 0,
+        delegations: data.delegationsCreated || 0,
       };
       const hasArtifacts = Object.values(artifacts).some(v => v > 0);
       setMessages(prev => [
@@ -82,6 +83,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
       const artifactParts: string[] = [];
       if (artifacts.tasks > 0) artifactParts.push(`${artifacts.tasks} task${artifacts.tasks > 1 ? 's' : ''} created`);
       if (artifacts.approvals > 0) artifactParts.push(`${artifacts.approvals} approval${artifacts.approvals > 1 ? 's' : ''} pending`);
+      if (artifacts.delegations > 0) artifactParts.push(`${artifacts.delegations} delegated`);
       if (artifacts.memories > 0) artifactParts.push(`${artifacts.memories} memor${artifacts.memories > 1 ? 'ies' : 'y'} saved`);
       if (artifacts.insights > 0) artifactParts.push(`${artifacts.insights} insight${artifacts.insights > 1 ? 's' : ''} logged`);
 
@@ -154,8 +156,8 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
                 msg.content
               )}
             </div>
-            {msg.artifacts && (msg.artifacts.tasks > 0 || msg.artifacts.approvals > 0) && (
-              <div className="flex gap-1.5 mt-1 px-1">
+            {msg.artifacts && (msg.artifacts.tasks > 0 || msg.artifacts.approvals > 0 || msg.artifacts.delegations > 0) && (
+              <div className="flex flex-wrap gap-1.5 mt-1 px-1">
                 {msg.artifacts.tasks > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
                     📋 {msg.artifacts.tasks} task{msg.artifacts.tasks > 1 ? 's' : ''}
@@ -164,6 +166,11 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
                 {msg.artifacts.approvals > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
                     ✋ {msg.artifacts.approvals} approval{msg.artifacts.approvals > 1 ? 's' : ''}
+                  </span>
+                )}
+                {msg.artifacts.delegations > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                    🤝 {msg.artifacts.delegations} delegated
                   </span>
                 )}
               </div>

@@ -18,6 +18,15 @@ const AGENT_SKILLS: Record<string, string[]> = {
   inbox: ["joncoach-core", "inbox-agent", "internal-comms"],
 };
 
+// ─── AGENT → WORKSPACE MAPPING ─────────────────────────────────────────────
+const AGENT_WORKSPACE: Record<string, string | null> = {
+  bloomsuite: "bloomsuite",
+  clinicleader: "clinicleader",
+  projectpath: "projectpath",
+  disc: "disc",
+  inbox: null,
+  executive: null,
+
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 
 interface Task {
@@ -47,6 +56,7 @@ interface ParsedArtifacts {
   output?: string;
   suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string }>;
+  delegate_to?: Array<{ agent_role: string; title: string; description?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_memories?: string[];
   insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
 }
@@ -240,6 +250,7 @@ Input: ${JSON.stringify(task.input_payload || {})}
 Execute this task fully. Produce real output — not a plan to do the work, but the actual work.
 If the output is something outbound (email, social post), put it in suggested_approvals.
 If you cannot complete this task, explain exactly what is blocking you.
+If part of this task belongs to a different agent's domain, use delegate_to.
 
 ## Response Format
 Respond with a JSON block:
@@ -250,10 +261,16 @@ Respond with a JSON block:
   "output": "The actual deliverable content if applicable",
   "suggested_tasks": [{ "title": "...", "urgency_score": 4, "impact_score": 5 }],
   "suggested_approvals": [],
+  "delegate_to": [{ "agent_role": "bloomsuite", "title": "...", "description": "...", "urgency_score": 3, "impact_score": 4 }],
   "suggested_memories": ["Jon prefers..."],
   "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
 }
 \`\`\`
+
+## Delegation Rules
+- Use delegate_to when work belongs to a DIFFERENT agent (bloomsuite, clinicleader, projectpath, disc, inbox, executive)
+- Do NOT delegate to yourself — use suggested_tasks instead
+- Include enough context in description for the receiving agent to work independently
 
 ## Memory Rules
 Only store memories that reference Jon's actual words or decisions.
@@ -304,13 +321,13 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
   taskId: string;
   status: string;
   message: string;
-  artifactCounts: { tasks: number; approvals: number; memories: number; insights: number };
+  artifactCounts: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
 }> {
   const result = {
     taskId: task.id,
     status: "completed" as string,
     message: "",
-    artifactCounts: { tasks: 0, approvals: 0, memories: 0, insights: 0 },
+    artifactCounts: { tasks: 0, approvals: 0, memories: 0, insights: 0, delegations: 0 },
   };
 
   try {
@@ -438,7 +455,38 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
         category: "general",
       }));
 
-    const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+    // --- DELEGATIONS: cross-agent task creation ---
+    const delegationRows: Record<string, unknown>[] = [];
+    const validAgents = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
+    for (const d of parsed.delegate_to || []) {
+      const targetAgent = d.agent_role;
+      if (!targetAgent || targetAgent === task.agent_role || !validAgents.includes(targetAgent)) {
+        console.log(`[delegation] Rejected: "${d.title}" → ${targetAgent || "none"}`);
+        continue;
+      }
+      const targetWorkspace = AGENT_WORKSPACE[targetAgent] || null;
+      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "");
+      if (similar) {
+        console.log(`[delegation-dedup] Skipping "${d.title}" → ${targetAgent}`);
+        continue;
+      }
+      delegationRows.push({
+        workspace_id: targetWorkspace,
+        agent_role: targetAgent,
+        title: (d.title || "Delegated task").slice(0, 120),
+        description: d.description || `Delegated from ${task.agent_role}`,
+        status: "pending",
+        priority: d.priority || 2,
+        urgency_score: d.urgency_score || 3,
+        impact_score: d.impact_score || 3,
+        depth: 0,
+        created_by: "agent",
+        source: "delegation",
+        input_payload: { delegated_from: task.agent_role, parent_task_id: task.id },
+      });
+    }
+
+    const [taskCount, approvalCount, memoryCount, insightCount, delegationCount] = await Promise.all([
       insertBatch("tasks", taskRows),
       insertBatch("approvals", (parsed.suggested_approvals || []).map(a => ({
         workspace_id: workspaceId,
@@ -451,9 +499,10 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
       }))),
       insertBatch("agent_memories", memoryRows),
       insertBatch("agent_insights", insightRows),
+      insertBatch("tasks", delegationRows),
     ]);
 
-    result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount };
+    result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount, delegations: delegationCount };
 
     // Determine final status
     if (approvalCount > 0) {
