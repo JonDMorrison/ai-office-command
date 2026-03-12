@@ -62,41 +62,22 @@ const ReadyToPost = () => {
     setTimeout(() => setCopiedIds(prev => ({ ...prev, [post.id]: false })), 2000);
   };
 
-  const generateImagePrompt = (postText: string): string => {
-    const words = postText.split(/\s+/).slice(0, 30).join(' ');
-    return `${words}. Professional, modern, clean design. Facebook post style. No text overlays. Warm brand colors.`;
-  };
-
   const handleGenerateImage = async (post: ApprovedPost) => {
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey) {
-      toast.error('Gemini API key not configured', { description: 'Set VITE_GEMINI_API_KEY in environment.' });
-      return;
-    }
-
     setGeneratingImages(prev => ({ ...prev, [post.id]: true }));
     try {
       const postText = getPostContent(post);
-      const prompt = generateImagePrompt(postText);
 
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key=${apiKey}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instances: [{ prompt }],
-            parameters: { sampleCount: 1, aspectRatio: '1:1' },
-          }),
-        }
-      );
+      const { data, error } = await supabase.functions.invoke('generate-post-image', {
+        body: { postText },
+      });
 
-      if (!res.ok) throw new Error(`API returned ${res.status}`);
-      const data = await res.json();
-      const base64 = data?.predictions?.[0]?.bytesBase64Encoded;
-      if (!base64) throw new Error('No image data in response');
+      if (error) throw new Error(error.message || 'Edge function error');
+      if (data?.error) throw new Error(data.error);
 
-      setGeneratedImages(prev => ({ ...prev, [post.id]: base64 }));
+      const imageUrl = data?.imageUrl;
+      if (!imageUrl) throw new Error('No image returned');
+
+      setGeneratedImages(prev => ({ ...prev, [post.id]: imageUrl }));
       toast.success('Image generated!');
     } catch (err) {
       console.error('Image generation failed:', err);
@@ -107,10 +88,10 @@ const ReadyToPost = () => {
   };
 
   const handleDownloadImage = (postId: string, agentRole: string) => {
-    const base64 = generatedImages[postId];
-    if (!base64) return;
+    const imageUrl = generatedImages[postId];
+    if (!imageUrl) return;
     const link = document.createElement('a');
-    link.href = `data:image/png;base64,${base64}`;
+    link.href = imageUrl;
     link.download = `${agentRole}-post-image.png`;
     link.click();
   };
@@ -238,7 +219,7 @@ const ReadyToPost = () => {
                   {imageBase64 && (
                     <div className="mb-3 rounded-lg overflow-hidden bg-muted aspect-square">
                       <img
-                        src={`data:image/png;base64,${imageBase64}`}
+                        src={imageBase64}
                         alt="Generated post image"
                         className="w-full h-full object-cover"
                       />
