@@ -611,7 +611,7 @@ serve(async (req) => {
     let totalTasksCreatedThisRun = 0;
     for (const task of queuedTasks) {
       const workspace = task.workspace_id ? workspaceMap.get(task.workspace_id) || null : null;
-      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN, totalTasksCreatedThisRun);
+      const result = await executeTask(task, workspace, GITHUB_TOKEN, totalTasksCreatedThisRun);
       totalTasksCreatedThisRun += result.artifactCounts.tasks;
       results.push(result);
       console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status} | Total tasks created this run: ${totalTasksCreatedThisRun}`);
