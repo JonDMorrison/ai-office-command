@@ -19,6 +19,7 @@ const Index = () => {
   const [showSkills, setShowSkills] = useState(false);
   const [standupActive, setStandupActive] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides, refetch: refetchAgentStates } = useAgentStates();
   const { tasks, fetchTasks, createTask } = useTasks();
