@@ -301,9 +301,11 @@ export type Database = {
       tasks: {
         Row: {
           agent_role: string
+          assigned_agent: string | null
           completed_at: string | null
           created_at: string
           created_by: string | null
+          created_by_agent: string | null
           depth: number | null
           description: string | null
           execution_priority: number | null
@@ -324,9 +326,11 @@ export type Database = {
         }
         Insert: {
           agent_role: string
+          assigned_agent?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_agent?: string | null
           depth?: number | null
           description?: string | null
           execution_priority?: number | null
@@ -347,9 +351,11 @@ export type Database = {
         }
         Update: {
           agent_role?: string
+          assigned_agent?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          created_by_agent?: string | null
           depth?: number | null
           description?: string | null
           execution_priority?: number | null
