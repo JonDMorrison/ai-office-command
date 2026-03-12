@@ -211,13 +211,10 @@ async function buildSystemPrompt(
   if (recentMemories.length > 0) {
     const memoryIds = recentMemories.map((m: any) => m.id).filter(Boolean);
     if (memoryIds.length > 0) {
-      fetch(`${baseUrl}/rest/v1/agent_memories?id=in.(${memoryIds.join(",")})`, {
-        method: "PATCH",
+      fetch(`${baseUrl}/rest/v1/rpc/bump_memory_references`, {
+        method: "POST",
         headers: { ...headers, Prefer: "return=minimal" },
-        body: JSON.stringify({
-          last_referenced_at: new Date().toISOString(),
-          reference_count: recentMemories[0]?.reference_count ? undefined : 1, // fallback
-        }),
+        body: JSON.stringify({ memory_ids: memoryIds }),
       }).catch(e => console.error("[memory-ref] Failed to bump references:", e));
     }
   }
