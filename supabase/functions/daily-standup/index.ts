@@ -5,10 +5,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+function getSupabaseHeaders(): Record<string, string> {
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  return {
+    apikey: key,
+    Authorization: `Bearer ${key}`,
+    "Content-Type": "application/json",
+    Prefer: "return=representation",
+  };
+}
+
+function getSupabaseUrl(): string {
+  return Deno.env.get("SUPABASE_URL") || "";
+}
+
+// ─── Gmail helpers (kept for inbox context) ─────────────────────────────────
+
 async function getGmailAccessToken(refreshToken: string): Promise<string> {
   const clientId = Deno.env.get("GMAIL_CLIENT_ID") || "";
   const clientSecret = Deno.env.get("GMAIL_CLIENT_SECRET") || "";
-
   const res = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -20,64 +35,133 @@ async function getGmailAccessToken(refreshToken: string): Promise<string> {
     }),
   });
   const data = await res.json();
-  if (!data.access_token) {
-    console.error("Gmail token exchange failed:", JSON.stringify(data));
-  }
-  return data.access_token;
+  return data.access_token || "";
 }
 
-async function fetchInboxSummary(accessToken: string, accountLabel?: string): Promise<string> {
-  const listRes = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15&q=is:unread",
-    { headers: { Authorization: `Bearer ${accessToken}` } }
-  );
-  const listData = await listRes.json();
-  const messages = listData.messages || [];
-  const summaries = await Promise.all(messages.map(async (msg: any) => {
-    const msgRes = await fetch(
-      `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Date`,
+async function fetchInboxSummary(accessToken: string, label: string): Promise<string> {
+  if (!accessToken) return `[${label}: Gmail unavailable]`;
+  try {
+    const listRes = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10&q=is:unread",
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    const msgData = await msgRes.json();
-    const headers = msgData.payload?.headers || [];
-    const subject = headers.find((h: any) => h.name === "Subject")?.value || "(no subject)";
-    const from = headers.find((h: any) => h.name === "From")?.value || "unknown";
-    const snippet = msgData.snippet || "";
-    const acctPrefix = accountLabel ? `[${accountLabel}] ` : "";
-    return `${acctPrefix}From: ${from}\nSubject: ${subject}\nSnippet: ${snippet}`;
-  }));
-  return summaries.join("\n\n");
+    const listData = await listRes.json();
+    const messages = listData.messages || [];
+    const summaries = await Promise.all(messages.map(async (msg: any) => {
+      const msgRes = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject`,
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      const msgData = await msgRes.json();
+      const headers = msgData.payload?.headers || [];
+      const subject = headers.find((h: any) => h.name === "Subject")?.value || "(no subject)";
+      const from = headers.find((h: any) => h.name === "From")?.value || "unknown";
+      return `[${label}] From: ${from} | Subject: ${subject}`;
+    }));
+    return summaries.join("\n");
+  } catch (e) {
+    console.error(`Gmail fetch failed for ${label}:`, e);
+    return `[${label}: Gmail unavailable]`;
+  }
 }
 
-async function askAgentForSuggestion(
-  apiKey: string,
-  agentName: string,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 200,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    }),
-  });
+// ─── Cross-workspace context from DB ────────────────────────────────────────
 
-  if (!res.ok) {
-    const err = await res.text();
-    console.error(`Anthropic error for ${agentName}: ${res.status} - ${err}`);
-    return `[Could not generate suggestion for ${agentName}]`;
-  }
+async function getExecutiveStandupContext(): Promise<Record<string, any>> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  const workspaces = ["bloomsuite", "clinicleader", "projectpath", "disc"];
+  const context: Record<string, any> = {};
 
-  const data = await res.json();
-  return data.content?.[0]?.text || `[No suggestion from ${agentName}]`;
+  await Promise.all(workspaces.map(async (ws) => {
+    const [tasksRes, approvalsRes, memoriesRes, insightsRes] = await Promise.all([
+      fetch(
+        `${baseUrl}/rest/v1/tasks?workspace_id=eq.${ws}&status=in.(pending,queued,blocked,waiting_for_input,in_progress)&order=urgency_score.desc&limit=8&select=title,status,urgency_score,impact_score,agent_role`,
+        { headers }
+      ),
+      fetch(
+        `${baseUrl}/rest/v1/approvals?workspace_id=eq.${ws}&status=eq.pending&limit=5&select=title,approval_type,agent_role`,
+        { headers }
+      ),
+      fetch(
+        `${baseUrl}/rest/v1/ranked_memories?workspace_id=eq.${ws}&order=effective_importance.desc&limit=5&select=memory_text,effective_importance`,
+        { headers }
+      ),
+      fetch(
+        `${baseUrl}/rest/v1/agent_insights?workspace_id=eq.${ws}&order=created_at.desc&limit=3&select=insight_text,signal_count,evidence`,
+        { headers }
+      ),
+    ]);
+
+    const [tasks, approvals, memories, insights] = await Promise.all([
+      tasksRes.ok ? tasksRes.json() : [],
+      approvalsRes.ok ? approvalsRes.json() : [],
+      memoriesRes.ok ? memoriesRes.json() : [],
+      insightsRes.ok ? insightsRes.json() : [],
+    ]);
+
+    context[ws] = {
+      activeTasks: tasks,
+      pendingApprovals: approvals,
+      recentMemories: memories.map((m: any) => m.memory_text),
+      recentInsights: insights,
+    };
+  }));
+
+  return context;
+}
+
+// ─── Executive system prompt ────────────────────────────────────────────────
+
+function buildExecutivePrompt(today: string, workspaceContext: string, inboxSummary: string): string {
+  return `You are Jon Morrison's Chief of Staff — an executive agent with visibility across all four of his businesses.
+
+Today is ${today}.
+
+## Cross-Workspace State
+
+${workspaceContext}
+
+## Inbox Summary
+
+${inboxSummary || "No unread emails."}
+
+## Your Job During the Daily Standup
+
+1. Read the state of all four workspaces (tasks, approvals, memories, recent insights)
+2. Identify the single most important thing across all products
+3. Surface the 3-5 highest priority actions Jon should take today
+4. Flag anything urgent or blocked
+5. Give Jon a clear recommendation on which product deserves his primary focus today
+
+## Response Format
+
+Respond in JSON:
+{
+  "message": "Your brief executive summary for Jon (2-3 sentences max)",
+  "focus_recommendation": "bloomsuite | clinicleader | projectpath | disc",
+  "focus_reason": "One sentence explanation of WHY this product needs Jon's focus today",
+  "standup_suggestions": [
+    {
+      "agent_role": "bloomsuite",
+      "workspace_id": "bloomsuite",
+      "title": "Short specific action title",
+      "description": "What to do and why it matters today",
+      "urgency_score": 4,
+      "impact_score": 5,
+      "task_type": "content_draft | outreach | research | analysis | build"
+    }
+  ]
+}
+
+## Rules
+- Maximum 5 suggestions total across all workspaces
+- At least one suggestion per workspace that has real active work
+- Never suggest vague tasks like "review strategy" — be specific and actionable
+- Urgency × Impact = execution priority — high scores only for genuinely important items
+- Reference actual tasks, approvals, or insights from the workspace state when possible
+- If a workspace has blocked tasks, prioritize unblocking them
+- Return raw JSON only — no markdown fences`;
 }
 
 serve(async (req) => {
@@ -86,114 +170,156 @@ serve(async (req) => {
   }
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
+    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    if (!LOVABLE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
+        JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const today = new Date().toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
 
-    console.log(`Daily standup started: ${today}`);
+    console.log(`[daily-standup] Started: ${today}`);
 
-    // Fetch Gmail data in parallel for BloomSuite and Inbox agents
+    // Fetch DB context and Gmail in parallel
     const bloomsuiteToken = Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "";
     const getclearToken = Deno.env.get("GMAIL_REFRESH_TOKEN") || "";
 
-    const [bloomsuiteInbox, getclearInbox, bloomsuiteInboxForInbox] = await Promise.all([
+    const [workspaceContext, bloomInbox, clearInbox] = await Promise.all([
+      getExecutiveStandupContext(),
       (async () => {
         try {
           const at = await getGmailAccessToken(bloomsuiteToken);
           return await fetchInboxSummary(at, "brandsinblooms.com");
-        } catch (e) {
-          console.error("Failed to fetch BloomSuite inbox:", e);
-          return "[Gmail unavailable]";
-        }
+        } catch { return "[Gmail unavailable]"; }
       })(),
       (async () => {
         try {
           const at = await getGmailAccessToken(getclearToken);
           return await fetchInboxSummary(at, "getclear.ca");
-        } catch (e) {
-          console.error("Failed to fetch getclear inbox:", e);
-          return "[Gmail unavailable]";
-        }
-      })(),
-      (async () => {
-        try {
-          const at = await getGmailAccessToken(bloomsuiteToken);
-          return await fetchInboxSummary(at, "brandsinblooms.com");
-        } catch (e) {
-          return "[Gmail unavailable]";
-        }
+        } catch { return "[Gmail unavailable]"; }
       })(),
     ]);
 
-    const combinedInbox = `### jon@getclear.ca\n\n${getclearInbox}\n\n### jon@brandsinblooms.com\n\n${bloomsuiteInboxForInbox}`;
+    const inboxSummary = `${clearInbox}\n${bloomInbox}`;
 
-    console.log(`Gmail data fetched. BloomSuite: ${bloomsuiteInbox.length}b, GetClear: ${getclearInbox.length}b`);
+    // Format workspace context for the prompt
+    const contextStr = Object.entries(workspaceContext).map(([ws, data]: [string, any]) => {
+      const parts: string[] = [`### ${ws}`];
+      if (data.activeTasks?.length) {
+        parts.push("Active tasks:");
+        data.activeTasks.forEach((t: any) => {
+          parts.push(`  - [${t.status}] ${t.title} (urgency: ${t.urgency_score}, impact: ${t.impact_score})`);
+        });
+      } else {
+        parts.push("No active tasks.");
+      }
+      if (data.pendingApprovals?.length) {
+        parts.push("Pending approvals:");
+        data.pendingApprovals.forEach((a: any) => parts.push(`  - ${a.title} (${a.approval_type})`));
+      }
+      if (data.recentMemories?.length) {
+        parts.push("Recent context:");
+        data.recentMemories.forEach((m: string) => parts.push(`  - ${m}`));
+      }
+      if (data.recentInsights?.length) {
+        parts.push("Recent insights:");
+        data.recentInsights.forEach((i: any) => parts.push(`  - ${i.insight_text} (signals: ${i.signal_count})`));
+      }
+      return parts.join("\n");
+    }).join("\n\n");
 
-    // Build agent-specific prompts and call Anthropic in parallel
-    const agentPrompts: Record<string, { system: string; user: string }> = {
-      bloomsuite: {
-        system: `You are BloomSuite, Jon Morrison's garden center marketing AI. Today is ${today}.\n\nHere are the current unread emails for jon@brandsinblooms.com:\n${bloomsuiteInbox}\n\nYou know BloomSuite inside and out — the Marketing Snap audit tool, the brandsinblooms app, content calendars, and garden center marketing strategy.`,
-        user: "In one sentence, what is the single most valuable thing Jon could do for BloomSuite this week? Be specific and actionable. Reference real emails or tasks if relevant.",
-      },
-      clinicleader: {
-        system: `You are ClinicLeader, Jon Morrison's clinic operations AI. Today is ${today}. ClinicLeader is a leadership operating system for clinics. The product is strong but distribution is the bottleneck.`,
-        user: "Based on the fact that ClinicLeader is blocked by distribution not product, suggest one specific outreach or content action Jon could take today. One sentence, be specific.",
-      },
-      projectpath: {
-        system: `You are ProjectPath, Jon Morrison's construction project management AI. Today is ${today}. ProjectPath is a construction OS with time tracking, estimates, invoicing, and playbooks. The product has been neglected and needs use-case clarity.`,
-        user: "ProjectPath is neglected and needs use-case clarity. Suggest one specific thing Jon could do to move it forward today. One sentence, be specific.",
-      },
-      disc: {
-        system: `You are DISC Profile, Jon Morrison's personality assessment AI. Today is ${today}. The DISC Profile app has serious potential for team dynamics consulting but is blocked by positioning.`,
-        user: "DISC Profile app has serious potential but is blocked by positioning. Suggest one specific marketing or content action for today. One sentence, be specific.",
-      },
-      inbox: {
-        system: `You are the Inbox agent, Jon Morrison's communication specialist. Today is ${today}.\n\nHere is the full inbox across both accounts:\n${combinedInbox}`,
-        user: "What is the most important email or thread Jon needs to handle today? Name the sender and subject if possible. One sentence, be specific.",
-      },
-      executive: {
-        system: `You are Jon Morrison's Chief of Staff. Today is ${today}. You see across all four products: BloomSuite (garden center marketing), ClinicLeader (clinic ops), ProjectPath (construction OS), and DISC Profile (personality assessments). Jon's priorities: traction over activity, distribution over building, one primary product per day.`,
-        user: "Looking across all of Jon's products, what is the ONE thing he should focus on today and why? Be decisive — give one answer, not options. One sentence.",
-      },
-    };
+    console.log(`[daily-standup] Context loaded. Calling executive agent...`);
 
-    const agentIds = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
+    // Call Lovable AI with executive prompt
+    const systemPrompt = buildExecutivePrompt(today, contextStr, inboxSummary);
 
-    const results = await Promise.all(
-      agentIds.map(id =>
-        askAgentForSuggestion(
-          ANTHROPIC_API_KEY,
-          id,
-          agentPrompts[id].system,
-          agentPrompts[id].user
-        )
-      )
-    );
-
-    const suggestions: Record<string, string> = {};
-    agentIds.forEach((id, i) => {
-      suggestions[id] = results[i];
+    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "google/gemini-2.5-flash",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: "Run the daily standup. Give me your executive briefing and today's prioritized actions." },
+        ],
+      }),
     });
 
-    console.log("Daily standup suggestions generated successfully");
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error(`[daily-standup] AI error: ${aiResponse.status} ${errText}`);
+
+      if (aiResponse.status === 429) {
+        return new Response(JSON.stringify({ error: "Rate limited — try again in a moment." }), {
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ error: "AI credits exhausted — add credits in Settings." }), {
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ error: "AI gateway error" }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const aiData = await aiResponse.json();
+    const rawText = aiData.choices?.[0]?.message?.content || "";
+
+    // Parse executive response
+    let parsed: any = {};
+    try {
+      const cleaned = rawText.replace(/```json\s*\n?|```\s*$/g, "").trim();
+      parsed = JSON.parse(cleaned);
+    } catch {
+      console.error("[daily-standup] Failed to parse executive response, using raw text");
+      parsed = {
+        message: rawText.slice(0, 300),
+        focus_recommendation: null,
+        focus_reason: null,
+        standup_suggestions: [],
+      };
+    }
+
+    // Build per-agent suggestions map for backward compat with DailyStandup component
+    const suggestions: Record<string, string> = {};
+    const structuredSuggestions: Array<{
+      agent_role: string;
+      workspace_id: string;
+      title: string;
+      description: string;
+      urgency_score: number;
+      impact_score: number;
+      task_type: string;
+    }> = parsed.standup_suggestions || [];
+
+    for (const s of structuredSuggestions) {
+      suggestions[s.agent_role] = `${s.title} — ${s.description}`;
+    }
+
+    console.log(`[daily-standup] Executive briefing complete. Focus: ${parsed.focus_recommendation}. ${structuredSuggestions.length} suggestions.`);
 
     return new Response(
-      JSON.stringify({ suggestions }),
+      JSON.stringify({
+        suggestions,
+        executive_summary: parsed.message || "",
+        focus_recommendation: parsed.focus_recommendation || null,
+        focus_reason: parsed.focus_reason || null,
+        structured_suggestions: structuredSuggestions,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
-    console.error("Daily standup error:", e);
+    console.error("[daily-standup] Error:", e);
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

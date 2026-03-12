@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.run-agent-tasks]
 verify_jwt = false
+
+[functions.daily-standup]
+verify_jwt = false
