@@ -5,6 +5,7 @@ export interface Agent {
   name: string;
   role: string;
   product: string;
+  workspaceId: string | null;
   colorVar: string;
   colorHex: string;
   avatar: string;
