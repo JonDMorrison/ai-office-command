@@ -57,7 +57,7 @@ interface ParsedArtifacts {
   message?: string;
   output?: string;
   suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
-  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string }>;
+  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; content?: string; platform?: string }>;
   delegate_to?: Array<{ agent_role: string; title: string; description?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_memories?: string[];
   insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
