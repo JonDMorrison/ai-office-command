@@ -196,11 +196,12 @@ function shouldStoreInsight(parsed: { evidence: string | null; signal_count: num
   return true;
 }
 
-async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+async function findSimilarActiveTask(workspaceId: string | null, title: string, assignedAgent?: string): Promise<any | null> {
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
   let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&limit=20`;
-  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+  if (assignedAgent) url += `&assigned_agent=eq.${assignedAgent}`;
+  else if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
   const res = await fetch(url, { headers });
   if (!res.ok) return null;
   const tasks = await res.json();
@@ -408,7 +409,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         }]);
         continue;
       }
-      const similar = await findSimilarActiveTask(workspaceId, t.title || "");
+      const similar = await findSimilarActiveTask(workspaceId, t.title || "", task.agent_role);
       if (similar) {
         console.log(`[task-dedup] Skipping "${t.title}" — similar to "${similar.title}"`);
         await insertBatch("task_events", [{
@@ -420,6 +421,8 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         taskRows.push({
           workspace_id: workspaceId,
           agent_role: task.agent_role,
+          assigned_agent: task.agent_role,
+          created_by_agent: task.agent_role,
           title: (t.title || "Untitled").slice(0, 120),
           description: t.description || null,
           task_type: t.task_type || "general",
@@ -470,7 +473,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         continue;
       }
       const targetWorkspace = AGENT_WORKSPACE[targetAgent] || null;
-      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "");
+      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "", targetAgent);
       if (similar) {
         console.log(`[delegation-dedup] Skipping "${d.title}" → ${targetAgent}`);
         continue;
@@ -478,6 +481,8 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
       delegationRows.push({
         workspace_id: targetWorkspace,
         agent_role: targetAgent,
+        assigned_agent: targetAgent,
+        created_by_agent: task.agent_role,
         title: (d.title || "Delegated task").slice(0, 120),
         description: d.description || `Delegated from ${task.agent_role}`,
         status: "pending",
@@ -676,6 +681,8 @@ Rules:
   const taskRows = (parsed.tasks || []).slice(0, 5).map((t: any) => ({
     workspace_id: t.workspace_id,
     agent_role: t.agent_role || t.workspace_id,
+    assigned_agent: t.agent_role || t.workspace_id,
+    created_by_agent: "executive",
     title: (t.title || "Untitled").slice(0, 120),
     description: t.description || null,
     task_type: t.task_type || "general",

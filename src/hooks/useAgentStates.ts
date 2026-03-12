@@ -66,10 +66,10 @@ export function useAgentStates() {
   // ── Poll real data every 8 seconds ──────────────────────────────────────
   const fetchRealStates = useCallback(async () => {
     try {
-      // Fetch active tasks (non-terminal statuses)
+      // Fetch active tasks — use assigned_agent for ownership clarity
       const { data: taskData } = await (supabase
         .from('tasks' as any)
-        .select('agent_role, status, title')
+        .select('agent_role, assigned_agent, status, title')
         .in('status', [
           TASK_STATUS.IN_PROGRESS,
           TASK_STATUS.QUEUED,
@@ -85,9 +85,10 @@ export function useAgentStates() {
         .eq('status', 'pending') as any);
 
       const tasksByAgent: Record<string, Array<{ status: string; title: string }>> = {};
-      for (const t of (taskData || []) as Array<{ agent_role: string; status: string; title: string }>) {
-        if (!tasksByAgent[t.agent_role]) tasksByAgent[t.agent_role] = [];
-        tasksByAgent[t.agent_role].push(t);
+      for (const t of (taskData || []) as Array<{ agent_role: string; assigned_agent: string | null; status: string; title: string }>) {
+        const owner = t.assigned_agent || t.agent_role;
+        if (!tasksByAgent[owner]) tasksByAgent[owner] = [];
+        tasksByAgent[owner].push(t);
       }
 
       const pendingApprovalAgents = new Set<string>(

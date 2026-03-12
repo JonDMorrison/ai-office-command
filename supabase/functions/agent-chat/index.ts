@@ -697,18 +697,19 @@ async function getTaskDepth(taskId: string): Promise<number> {
   return data?.[0]?.depth || 0;
 }
 
-async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
-  if (!workspaceId) return null;
+async function findSimilarActiveTask(workspaceId: string | null, title: string, assignedAgent?: string): Promise<any | null> {
+  if (!workspaceId && !assignedAgent) return null;
 
   const keywords = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
   if (keywords.length === 0) return null;
 
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
-  const res = await fetch(
-    `${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress)&select=id,title,status&limit=20`,
-    { headers }
-  );
+  let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&select=id,title,status&limit=20`;
+  if (assignedAgent) url += `&assigned_agent=eq.${assignedAgent}`;
+  else if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+
+  const res = await fetch(url, { headers });
   if (!res.ok) return null;
   const tasks = await res.json();
 
@@ -746,7 +747,7 @@ async function processAgentArtifacts(
       }
 
       // Collision detection — check for similar active tasks
-      const similar = await findSimilarActiveTask(workspaceId, task.title || "");
+      const similar = await findSimilarActiveTask(workspaceId, task.title || "", task.agent_role || agentId);
 
       if (similar) {
         console.log(`[task-dedup] Skipping "${task.title}" — similar to "${similar.title}"`);
@@ -768,6 +769,8 @@ async function processAgentArtifacts(
         body: JSON.stringify({
           workspace_id: workspaceId,
           agent_role: task.agent_role || agentId,
+          assigned_agent: task.agent_role || agentId,
+          created_by_agent: agentId,
           title: (task.title || "Untitled").slice(0, 120),
           description: task.description || "",
           status: "pending",
@@ -893,7 +896,7 @@ async function processAgentArtifacts(
       const targetWorkspace = getWorkspaceForAgent(targetAgent);
 
       // Collision detection in target workspace
-      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "");
+      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "", targetAgent);
       if (similar) {
         console.log(`[delegation-dedup] Skipping "${delegation.title}" → ${targetAgent} — similar to "${similar.title}"`);
         await fetch(`${baseUrl}/rest/v1/task_events`, {
@@ -914,6 +917,8 @@ async function processAgentArtifacts(
         body: JSON.stringify({
           workspace_id: targetWorkspace,
           agent_role: targetAgent,
+          assigned_agent: targetAgent,
+          created_by_agent: agentId,
           title: (delegation.title || "Delegated task").slice(0, 120),
           description: delegation.description || `Delegated from ${agentId}`,
           status: "pending",
