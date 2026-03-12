@@ -106,7 +106,23 @@ const DailyStandup = ({ onApproved, onDismiss, onCreateTask }: DailyStandupProps
 
   const handleDecision = useCallback((agentId: string, decision: 'approved' | 'skipped') => {
     setDecisions(prev => ({ ...prev, [agentId]: decision }));
-  }, []);
+
+    if (decision === 'approved' && onCreateTask) {
+      const agent = agents.find(a => a.id === agentId);
+      const suggestion = suggestions[agentId] || '';
+      const agentFollowUp = followUps[agentId];
+      onCreateTask({
+        agent_role: agentId,
+        title: suggestion.length > 120 ? suggestion.slice(0, 117) + '...' : suggestion,
+        description: suggestion,
+        input_payload: {
+          suggestion,
+          ...(agentFollowUp ? { follow_up: agentFollowUp } : {}),
+          agent_name: agent?.name || agentId,
+        },
+      });
+    }
+  }, [onCreateTask, suggestions, followUps]);
 
   const allDecided = Object.values(decisions).every(d => d !== null);
 

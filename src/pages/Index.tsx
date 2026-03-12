@@ -96,6 +96,7 @@ const Index = () => {
             <DailyStandup
               onApproved={handleStandupApproved}
               onDismiss={handleStandupDismiss}
+              onCreateTask={createTask}
             />
           )}
 
