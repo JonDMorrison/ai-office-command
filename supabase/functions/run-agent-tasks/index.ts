@@ -240,6 +240,7 @@ Input: ${JSON.stringify(task.input_payload || {})}
 Execute this task fully. Produce real output — not a plan to do the work, but the actual work.
 If the output is something outbound (email, social post), put it in suggested_approvals.
 If you cannot complete this task, explain exactly what is blocking you.
+If part of this task belongs to a different agent's domain, use delegate_to.
 
 ## Response Format
 Respond with a JSON block:
@@ -250,10 +251,16 @@ Respond with a JSON block:
   "output": "The actual deliverable content if applicable",
   "suggested_tasks": [{ "title": "...", "urgency_score": 4, "impact_score": 5 }],
   "suggested_approvals": [],
+  "delegate_to": [{ "agent_role": "bloomsuite", "title": "...", "description": "...", "urgency_score": 3, "impact_score": 4 }],
   "suggested_memories": ["Jon prefers..."],
   "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
 }
 \`\`\`
+
+## Delegation Rules
+- Use delegate_to when work belongs to a DIFFERENT agent (bloomsuite, clinicleader, projectpath, disc, inbox, executive)
+- Do NOT delegate to yourself — use suggested_tasks instead
+- Include enough context in description for the receiving agent to work independently
 
 ## Memory Rules
 Only store memories that reference Jon's actual words or decisions.

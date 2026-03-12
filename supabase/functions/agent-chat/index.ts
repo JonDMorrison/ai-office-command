@@ -1053,6 +1053,7 @@ serve(async (req) => {
         approvalsCreated: artifactCounts.approvalsCreated,
         memoriesCreated: artifactCounts.memoriesCreated,
         insightsCreated: artifactCounts.insightsCreated,
+        delegationsCreated: artifactCounts.delegationsCreated,
         raw: parsedResponse,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
