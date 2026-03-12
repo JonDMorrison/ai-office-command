@@ -61,10 +61,16 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
 
       if (error) throw error;
 
-      const artifacts = data.artifacts_created || undefined;
+      const artifacts = {
+        tasks: data.tasksCreated || 0,
+        approvals: data.approvalsCreated || 0,
+        memories: data.memoriesCreated || 0,
+        insights: data.insightsCreated || 0,
+      };
+      const hasArtifacts = Object.values(artifacts).some(v => v > 0);
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.text || 'No response.', artifacts },
+        { role: 'assistant', content: data.message || data.text || 'No response.', artifacts: hasArtifacts ? artifacts : undefined },
       ]);
     } catch (err) {
       console.error('Chat error:', err);
