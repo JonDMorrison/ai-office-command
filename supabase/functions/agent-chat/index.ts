@@ -416,12 +416,11 @@ async function fetchSkillContent(skillName: string, githubToken: string): Promis
   return await res.text();
 }
 
-async function loadSkillModules(agentId: string, githubToken: string): Promise<string> {
+async function loadSkillModules(agentId: string, githubToken: string): Promise<string[]> {
   const skillNames = AGENT_SKILLS[agentId] || [];
-  if (skillNames.length === 0) return "";
+  if (skillNames.length === 0) return [];
   console.log(`[skills] Loading ${skillNames.length} skills for ${agentId}`);
-  const contents = await Promise.all(skillNames.map(name => fetchSkillContent(name, githubToken)));
-  return contents.join("\n\n---\n\n");
+  return await Promise.all(skillNames.map(name => fetchSkillContent(name, githubToken)));
 }
 
 // ─── DATA LOADERS ───────────────────────────────────────────────────────────
