@@ -58,6 +58,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
   const { state, taskIndex, standupOverride, activeTaskTitle } = dynamicState;
   const isActive = state === 'working' || state === 'needs_input' || state === 'blocked';
   const isExecutive = agent.id === 'executive';
+  const isBlocked = state === 'blocked';
 
   const bubble = standupOverride
     ? { bg: 'hsl(142 76% 96%)', border: 'hsl(142 71% 45%)', label: '✦ Working on it...' }
@@ -69,7 +70,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
 
   return (
     <div
-      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isExecutive ? 'executive-desk' : ''}`}
+      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isExecutive ? 'executive-desk' : ''} ${isBlocked ? 'blocked-state' : ''}`}
       onClick={onClick}
     >
       {/* Glow ring */}
