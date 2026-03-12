@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, Send, Settings } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
+import { toast } from '@/hooks/use-toast';
 
 interface ChatPanelProps {
   agent: Agent;
@@ -56,7 +57,11 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
       conversationMessages.push({ role: 'user', content: userMessage });
 
       const { data, error } = await supabase.functions.invoke('agent-chat', {
-        body: { messages: conversationMessages, agentId: agent.id },
+        body: {
+          messages: conversationMessages,
+          agentId: agent.id,
+          workspaceId: agent.workspaceId,
+        },
       });
 
       if (error) throw error;
@@ -72,6 +77,20 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
         ...prev,
         { role: 'assistant', content: data.message || data.text || 'No response.', artifacts: hasArtifacts ? artifacts : undefined },
       ]);
+
+      // Show toast for created artifacts
+      const artifactParts: string[] = [];
+      if (artifacts.tasks > 0) artifactParts.push(`${artifacts.tasks} task${artifacts.tasks > 1 ? 's' : ''} created`);
+      if (artifacts.approvals > 0) artifactParts.push(`${artifacts.approvals} approval${artifacts.approvals > 1 ? 's' : ''} pending`);
+      if (artifacts.memories > 0) artifactParts.push(`${artifacts.memories} memor${artifacts.memories > 1 ? 'ies' : 'y'} saved`);
+      if (artifacts.insights > 0) artifactParts.push(`${artifacts.insights} insight${artifacts.insights > 1 ? 's' : ''} logged`);
+
+      if (artifactParts.length > 0) {
+        toast({
+          description: artifactParts.join(' · '),
+          duration: 3000,
+        });
+      }
     } catch (err) {
       console.error('Chat error:', err);
       setMessages(prev => [
