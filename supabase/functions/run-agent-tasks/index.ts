@@ -409,7 +409,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         }]);
         continue;
       }
-      const similar = await findSimilarActiveTask(workspaceId, t.title || "");
+      const similar = await findSimilarActiveTask(workspaceId, t.title || "", task.agent_role);
       if (similar) {
         console.log(`[task-dedup] Skipping "${t.title}" — similar to "${similar.title}"`);
         await insertBatch("task_events", [{
