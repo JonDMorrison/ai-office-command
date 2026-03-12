@@ -93,10 +93,10 @@ export function useTasks() {
     }
   }, []);
 
-  const updateTaskStatus = useCallback(async (taskId: string, status: string) => {
+  const updateTaskStatus = useCallback(async (taskId: string, status: TaskStatus) => {
     try {
       const updates: Record<string, unknown> = { status };
-      if (status === 'completed') updates.completed_at = new Date().toISOString();
+      if (status === TASK_STATUS.COMPLETED) updates.completed_at = new Date().toISOString();
 
       const { error } = await (supabase
         .from('tasks' as any)
