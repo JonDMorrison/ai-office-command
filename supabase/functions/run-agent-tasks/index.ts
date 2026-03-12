@@ -556,8 +556,8 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
 // ─── SCHEDULED STANDUP: Pre-populate tasks via executive agent ──────────────
 
 async function runScheduledStandup(): Promise<{ message: string; tasksCreated: number }> {
-  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+  // Scheduled standup uses REASONING model (Claude) — cross-workspace prioritization
+  console.log("[scheduled-standup] Using REASONING model (Claude) for executive synthesis");
 
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
