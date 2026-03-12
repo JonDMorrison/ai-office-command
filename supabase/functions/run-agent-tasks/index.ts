@@ -196,11 +196,12 @@ function shouldStoreInsight(parsed: { evidence: string | null; signal_count: num
   return true;
 }
 
-async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+async function findSimilarActiveTask(workspaceId: string | null, title: string, assignedAgent?: string): Promise<any | null> {
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
   let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&limit=20`;
-  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+  if (assignedAgent) url += `&assigned_agent=eq.${assignedAgent}`;
+  else if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
   const res = await fetch(url, { headers });
   if (!res.ok) return null;
   const tasks = await res.json();
