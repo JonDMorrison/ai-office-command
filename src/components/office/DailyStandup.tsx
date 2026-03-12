@@ -15,11 +15,12 @@ const FALLBACK_SUGGESTIONS: Record<string, string> = {
 };
 
 const MEETING_POSITIONS = [
-  { x: -120, y: -40 },
-  { x: -60,  y: -70 },
-  { x: 0,    y: -80 },
-  { x: 60,   y: -70 },
-  { x: 120,  y: -40 },
+  { x: -160, y: -40 },
+  { x: -96,  y: -70 },
+  { x: -32,  y: -80 },
+  { x: 32,   y: -80 },
+  { x: 96,   y: -70 },
+  { x: 160,  y: -40 },
 ];
 
 interface DailyStandupProps {

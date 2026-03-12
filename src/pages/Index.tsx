@@ -53,8 +53,9 @@ const Index = () => {
     { top: '8%', left: '12%' },
     { top: '8%', left: '50%', transform: 'translateX(-50%)' },
     { top: '8%', right: '12%' },
-    { top: '52%', left: '20%' },
-    { top: '52%', right: '20%' },
+    { top: '52%', left: '15%' },
+    { top: '52%', left: '50%', transform: 'translateX(-50%)' },
+    { top: '52%', right: '15%' },
   ];
 
   return (
