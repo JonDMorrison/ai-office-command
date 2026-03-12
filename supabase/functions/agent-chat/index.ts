@@ -309,6 +309,15 @@ Respond in valid JSON using this exact structure:
       "full_payload": {}
     }
   ],
+  "delegate_to": [
+    {
+      "agent_role": "bloomsuite",
+      "title": "Short task title for the other agent",
+      "description": "Full context so the receiving agent can execute independently",
+      "urgency_score": 3,
+      "impact_score": 4
+    }
+  ],
   "suggested_memories": [
     "Plain language fact about Jon or this workspace worth remembering long-term"
   ],
@@ -325,6 +334,8 @@ Rules:
 - Always include "message"
 - Only include other fields when you have real content — omit empty arrays entirely
 - For any outbound communication use suggested_approvals — never output content inline
+- Use delegate_to when work belongs to a DIFFERENT agent's workspace (bloomsuite, clinicleader, projectpath, disc, inbox, executive)
+- Do NOT delegate to yourself — use suggested_tasks for your own workspace
 - Only add memories when Jon states a preference, makes a decision, or you observe a repeated pattern
 - Only add insights with evidence and signal_count >= 2
 - Never wrap your response in markdown code blocks — return raw JSON only`);
