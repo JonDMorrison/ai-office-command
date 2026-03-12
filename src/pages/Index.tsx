@@ -11,7 +11,7 @@ import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
 import ApprovalQueue from '@/components/office/ApprovalQueue';
-import ActivityFeed from '@/components/office/ActivityFeed';
+import ActivityFeed, { ActivityFeedPanel } from '@/components/office/ActivityFeed';
 import OperationsRail from '@/components/office/OperationsRail';
 
 const Index = () => {
