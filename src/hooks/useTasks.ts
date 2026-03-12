@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { TASK_STATUS, COMPANY_ID, type TaskStatus } from '@/lib/constants';
 
 export interface Task {
   id: string;
@@ -8,7 +9,7 @@ export interface Task {
   title: string;
   description: string | null;
   task_type: string;
-  status: string;
+  status: TaskStatus;
   priority: number;
   requires_approval: boolean;
   source: string;
@@ -18,8 +19,6 @@ export interface Task {
   updated_at: string;
   completed_at: string | null;
 }
-
-const COMPANY_ID = 'joncoach'; // Single-tenant for now
 
 export function useTasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -67,7 +66,7 @@ export function useTasks() {
         task_type: task.task_type || 'general',
         source: task.source || 'standup',
         priority: task.priority || 3,
-        status: 'approved',
+        status: TASK_STATUS.QUEUED,
         input_payload: (task.input_payload || {}) as unknown as Record<string, unknown>,
       };
 
@@ -94,10 +93,10 @@ export function useTasks() {
     }
   }, []);
 
-  const updateTaskStatus = useCallback(async (taskId: string, status: string) => {
+  const updateTaskStatus = useCallback(async (taskId: string, status: TaskStatus) => {
     try {
       const updates: Record<string, unknown> = { status };
-      if (status === 'completed') updates.completed_at = new Date().toISOString();
+      if (status === TASK_STATUS.COMPLETED) updates.completed_at = new Date().toISOString();
 
       const { error } = await (supabase
         .from('tasks' as any)

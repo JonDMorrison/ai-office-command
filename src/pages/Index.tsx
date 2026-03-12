@@ -3,6 +3,7 @@ import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
 import { useTasks } from '@/hooks/useTasks';
 import { useApprovals } from '@/hooks/useApprovals';
+import { TASK_STATUS } from '@/lib/constants';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel from '@/components/office/ChatPanel';
@@ -24,7 +25,7 @@ const Index = () => {
 
   // Load persisted data on mount
   useEffect(() => {
-    fetchTasks({ status: 'approved' });
+    fetchTasks({ status: TASK_STATUS.QUEUED });
     fetchApprovals({ status: 'pending' });
   }, [fetchTasks, fetchApprovals]);
 
