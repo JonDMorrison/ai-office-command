@@ -130,8 +130,8 @@ const Index = () => {
           {/* Operations Rail — bottom left, inside the room */}
           <OperationsRail />
 
-          {/* Activity Feed — bottom right, inside the room */}
-          <ActivityFeed />
+          {/* Activity Feed trigger — bottom right, inside the room */}
+          {!showActivity && <ActivityFeed onOpen={handleOpenActivity} />}
 
           {/* Daily Standup overlay */}
           {standupActive && (
