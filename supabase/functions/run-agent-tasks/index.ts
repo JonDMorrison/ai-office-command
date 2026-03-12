@@ -26,6 +26,7 @@ const AGENT_WORKSPACE: Record<string, string | null> = {
   disc: "disc",
   inbox: null,
   executive: null,
+};
 
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 
