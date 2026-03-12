@@ -482,11 +482,18 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "No response generated.";
+    const fullText = data.content?.[0]?.text || "No response generated.";
+
+    // Parse artifacts from response
+    const { message: chatMessage, artifacts } = extractArtifacts(fullText);
+    const artifactCounts = await processArtifacts(agentId, artifacts);
+
+    // Log the output
+    await logAgentOutput(agentId, chatMessage, artifactCounts, !!artifacts);
 
     // Post-processing: save Gmail drafts if applicable
     if (agentId === "inbox" || agentId === "bloomsuite") {
-      const drafts = parseDraftBlocks(text);
+      const drafts = parseDraftBlocks(fullText);
       if (drafts.length > 0) {
         try {
           const accessToken = agentId === "bloomsuite"
@@ -501,7 +508,10 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ text }),
+      JSON.stringify({
+        text: chatMessage,
+        artifacts_created: artifactCounts,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
