@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { agents } from '@/data/agents';
 import { Link } from 'react-router-dom';
+import { getTemplatesForAgent, type BrandTemplate } from '@/config/brandTemplates';
 
 interface ApprovedPost {
   id: string;
@@ -21,6 +22,8 @@ const ReadyToPost = () => {
   const [generatedImages, setGeneratedImages] = useState<Record<string, string>>({});
   const [copiedIds, setCopiedIds] = useState<Record<string, boolean>>({});
   const [fadingOut, setFadingOut] = useState<Record<string, boolean>>({});
+  const [selectedTemplates, setSelectedTemplates] = useState<Record<string, string>>({});
+  const [editedPrompts, setEditedPrompts] = useState<Record<string, string>>({});
 
   const fetchPosts = useCallback(async () => {
     setLoading(true);
@@ -55,6 +58,26 @@ const ReadyToPost = () => {
     return payload?.platform || payload?.channel || 'Social Post';
   };
 
+  const getSelectedTemplate = (post: ApprovedPost): BrandTemplate => {
+    const config = getTemplatesForAgent(post.agent_role);
+    const selectedId = selectedTemplates[post.id];
+    return config.templates.find(t => t.id === selectedId) || config.templates[0];
+  };
+
+  const getPromptForPost = (post: ApprovedPost): string => {
+    if (editedPrompts[post.id] !== undefined) return editedPrompts[post.id];
+    const template = getSelectedTemplate(post);
+    return template.buildPrompt(getPostContent(post));
+  };
+
+  const handleSelectTemplate = (postId: string, templateId: string, post: ApprovedPost) => {
+    setSelectedTemplates(prev => ({ ...prev, [postId]: templateId }));
+    // Reset the edited prompt so it regenerates from the new template
+    const config = getTemplatesForAgent(post.agent_role);
+    const template = config.templates.find(t => t.id === templateId) || config.templates[0];
+    setEditedPrompts(prev => ({ ...prev, [postId]: template.buildPrompt(getPostContent(post)) }));
+  };
+
   const handleCopy = async (post: ApprovedPost) => {
     const text = getPostContent(post);
     await navigator.clipboard.writeText(text);
@@ -65,10 +88,10 @@ const ReadyToPost = () => {
   const handleGenerateImage = async (post: ApprovedPost) => {
     setGeneratingImages(prev => ({ ...prev, [post.id]: true }));
     try {
-      const postText = getPostContent(post);
+      const prompt = getPromptForPost(post);
 
       const { data, error } = await supabase.functions.invoke('generate-post-image', {
-        body: { postText },
+        body: { postText: prompt },
       });
 
       if (error) throw new Error(error.message || 'Edge function error');
@@ -98,7 +121,7 @@ const ReadyToPost = () => {
 
   const handleMarkAsPosted = async (post: ApprovedPost) => {
     setFadingOut(prev => ({ ...prev, [post.id]: true }));
-    
+
     const { error } = await (supabase
       .from('approvals' as any)
       .update({
@@ -161,9 +184,12 @@ const ReadyToPost = () => {
             const content = getPostContent(post);
             const platform = getPostPlatform(post);
             const isFading = fadingOut[post.id];
-            const imageBase64 = generatedImages[post.id];
+            const imageUrl = generatedImages[post.id];
             const isGenerating = generatingImages[post.id];
             const isCopied = copiedIds[post.id];
+            const brandConfig = getTemplatesForAgent(post.agent_role);
+            const selectedTemplate = getSelectedTemplate(post);
+            const currentPrompt = getPromptForPost(post);
 
             return (
               <div
@@ -214,12 +240,60 @@ const ReadyToPost = () => {
                   </button>
                 </div>
 
+                {/* Template selector */}
+                <div className="px-5 pb-4 border-t border-border pt-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                    Image Template
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {brandConfig.templates.map(template => {
+                      const isSelected = selectedTemplate.id === template.id;
+                      return (
+                        <button
+                          key={template.id}
+                          onClick={() => handleSelectTemplate(post.id, template.id, post)}
+                          className="text-left p-2.5 rounded-lg border transition-all"
+                          style={{
+                            borderColor: isSelected ? brandConfig.accentColor : 'hsl(var(--border))',
+                            backgroundColor: isSelected
+                              ? `${brandConfig.accentColor}15`
+                              : 'transparent',
+                          }}
+                        >
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-sm">{template.emoji}</span>
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              {template.label}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground leading-tight">
+                            {template.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Editable prompt */}
+                <div className="px-5 pb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
+                    Image Prompt
+                  </p>
+                  <textarea
+                    value={currentPrompt}
+                    onChange={(e) => setEditedPrompts(prev => ({ ...prev, [post.id]: e.target.value }))}
+                    rows={4}
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs text-foreground leading-relaxed resize-y focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
                 {/* Image section */}
                 <div className="px-5 pb-4 border-t border-border pt-4">
-                  {imageBase64 && (
+                  {imageUrl && (
                     <div className="mb-3 rounded-lg overflow-hidden bg-muted aspect-square">
                       <img
-                        src={imageBase64}
+                        src={imageUrl}
                         alt="Generated post image"
                         className="w-full h-full object-cover"
                       />
@@ -236,9 +310,9 @@ const ReadyToPost = () => {
                           <span className="inline-block w-3 h-3 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
                           Generating…
                         </span>
-                      ) : imageBase64 ? 'REGENERATE IMAGE' : 'GENERATE IMAGE'}
+                      ) : imageUrl ? 'REGENERATE WITH GEMINI ✨' : 'GENERATE WITH GEMINI ✨'}
                     </button>
-                    {imageBase64 && (
+                    {imageUrl && (
                       <button
                         onClick={() => handleDownloadImage(post.id, post.agent_role)}
                         className="flex-1 py-2 rounded-lg text-xs font-semibold border border-border text-foreground hover:bg-secondary transition-all"
