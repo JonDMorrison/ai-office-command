@@ -18,7 +18,7 @@ export interface Approval {
   rejected_at: string | null;
 }
 
-const COMPANY_ID = 'joncoach';
+
 
 export function useApprovals() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
