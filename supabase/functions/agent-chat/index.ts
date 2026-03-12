@@ -793,6 +793,12 @@ async function processAgentArtifacts(
   // --- APPROVALS ---
   if (parsed.suggested_approvals?.length) {
     for (const approval of parsed.suggested_approvals) {
+      const approvalTitle = (approval.title && approval.title !== "Untitled" ? approval.title : "Draft from " + agentId).slice(0, 120);
+      const approvalPreview = approval.preview_text || approval.content?.slice(0, 300) || "";
+      const approvalPayload = approval.full_payload && Object.keys(approval.full_payload).length > 0
+        ? approval.full_payload
+        : { content: approval.content || approval.preview_text || null, platform: approval.platform || null, agent: agentId };
+
       const res = await fetch(`${baseUrl}/rest/v1/approvals`, {
         method: "POST",
         headers,
@@ -800,9 +806,9 @@ async function processAgentArtifacts(
           workspace_id: workspaceId,
           agent_role: agentId,
           approval_type: approval.approval_type || "general",
-          title: approval.title || "Untitled",
-          preview_text: (approval.preview_text || "").slice(0, 150),
-          full_payload: approval.full_payload || {},
+          title: approvalTitle,
+          preview_text: approvalPreview.slice(0, 300),
+          full_payload: approvalPayload,
           status: "pending",
         }),
       });
