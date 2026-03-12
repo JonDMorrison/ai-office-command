@@ -156,8 +156,8 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
                 msg.content
               )}
             </div>
-            {msg.artifacts && (msg.artifacts.tasks > 0 || msg.artifacts.approvals > 0) && (
-              <div className="flex gap-1.5 mt-1 px-1">
+            {msg.artifacts && (msg.artifacts.tasks > 0 || msg.artifacts.approvals > 0 || msg.artifacts.delegations > 0) && (
+              <div className="flex flex-wrap gap-1.5 mt-1 px-1">
                 {msg.artifacts.tasks > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
                     📋 {msg.artifacts.tasks} task{msg.artifacts.tasks > 1 ? 's' : ''}
@@ -166,6 +166,11 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
                 {msg.artifacts.approvals > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
                     ✋ {msg.artifacts.approvals} approval{msg.artifacts.approvals > 1 ? 's' : ''}
+                  </span>
+                )}
+                {msg.artifacts.delegations > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                    🤝 {msg.artifacts.delegations} delegated
                   </span>
                 )}
               </div>
