@@ -494,9 +494,9 @@ serve(async (req) => {
     const baseUrl = getSupabaseUrl();
     const headers = getSupabaseHeaders();
 
-    // 1. Fetch queued tasks (up to 5, ordered by priority then created_at)
+    // 1. Fetch queued tasks (up to 5, ordered by execution_priority DESC then created_at ASC)
     const tasksRes = await fetch(
-      `${baseUrl}/rest/v1/tasks?status=eq.queued&order=priority.asc,created_at.asc&limit=5`,
+      `${baseUrl}/rest/v1/tasks?status=eq.queued&order=execution_priority.desc,created_at.asc&limit=5`,
       { headers }
     );
     if (!tasksRes.ok) {
