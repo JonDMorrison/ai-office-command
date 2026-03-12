@@ -90,6 +90,8 @@ interface ScaffoldInput {
   inboxContext?: string;
   activeTasks?: string;
   pendingApprovals?: string;
+  memories?: string;
+  insights?: string;
 }
 
 function buildPromptScaffold(input: ScaffoldInput): string {
