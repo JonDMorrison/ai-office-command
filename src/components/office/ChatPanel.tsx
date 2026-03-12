@@ -14,6 +14,7 @@ interface ChatPanelProps {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  artifacts?: { tasks: number; approvals: number; memories: number; insights: number };
 }
 
 const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps) => {
