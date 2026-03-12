@@ -419,10 +419,68 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      ranked_memories: {
+        Row: {
+          agent_role: string | null
+          confidence: string | null
+          created_at: string | null
+          effective_importance: number | null
+          expires_at: string | null
+          id: string | null
+          importance: number | null
+          last_referenced_at: string | null
+          memory_text: string | null
+          memory_type: string | null
+          reference_count: number | null
+          relevance_score: number | null
+          source: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          agent_role?: string | null
+          confidence?: string | null
+          created_at?: string | null
+          effective_importance?: never
+          expires_at?: string | null
+          id?: string | null
+          importance?: number | null
+          last_referenced_at?: string | null
+          memory_text?: string | null
+          memory_type?: string | null
+          reference_count?: number | null
+          relevance_score?: number | null
+          source?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          agent_role?: string | null
+          confidence?: string | null
+          created_at?: string | null
+          effective_importance?: never
+          expires_at?: string | null
+          id?: string | null
+          importance?: number | null
+          last_referenced_at?: string | null
+          memory_text?: string | null
+          memory_type?: string | null
+          reference_count?: number | null
+          relevance_score?: number | null
+          source?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      [_ in never]: never
+      memory_effective_importance: {
+        Args: {
+          p_created_at: string
+          p_importance: number
+          p_last_referenced_at: string
+          p_reference_count: number
+        }
+        Returns: number
+      }
     }
     Enums: {
       [_ in never]: never
