@@ -140,6 +140,7 @@ const Index = () => {
             agent={selectedAgent}
             onClose={() => setSelectedAgentId(null)}
             onOpenSkills={() => setShowSkills(true)}
+            onOpenApprovals={handleOpenApprovals}
             initialNote={followUpNotes.current[selectedAgent.id]}
           />
         )}
