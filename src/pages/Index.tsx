@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
+import { useTasks } from '@/hooks/useTasks';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel from '@/components/office/ChatPanel';
