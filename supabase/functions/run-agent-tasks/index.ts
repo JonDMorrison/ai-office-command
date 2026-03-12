@@ -480,6 +480,8 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
       delegationRows.push({
         workspace_id: targetWorkspace,
         agent_role: targetAgent,
+        assigned_agent: targetAgent,
+        created_by_agent: task.agent_role,
         title: (d.title || "Delegated task").slice(0, 120),
         description: d.description || `Delegated from ${task.agent_role}`,
         status: "pending",
