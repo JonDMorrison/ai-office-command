@@ -420,6 +420,8 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         taskRows.push({
           workspace_id: workspaceId,
           agent_role: task.agent_role,
+          assigned_agent: task.agent_role,
+          created_by_agent: task.agent_role,
           title: (t.title || "Untitled").slice(0, 120),
           description: t.description || null,
           task_type: t.task_type || "general",
