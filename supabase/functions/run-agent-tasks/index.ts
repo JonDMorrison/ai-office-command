@@ -564,12 +564,155 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
 
 // ─── MAIN HANDLER ───────────────────────────────────────────────────────────
 
+// ─── SCHEDULED STANDUP: Pre-populate tasks via executive agent ──────────────
+
+async function runScheduledStandup(): Promise<{ message: string; tasksCreated: number }> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  const workspaces = ["bloomsuite", "clinicleader", "projectpath", "disc"];
+
+  // Gather cross-workspace context
+  const contextParts: string[] = [];
+  await Promise.all(workspaces.map(async (ws) => {
+    const [tasksRes, approvalsRes, memoriesRes] = await Promise.all([
+      fetch(`${baseUrl}/rest/v1/tasks?workspace_id=eq.${ws}&status=in.(pending,queued,blocked,waiting_for_input,in_progress)&order=urgency_score.desc&limit=8&select=title,status,urgency_score,impact_score,agent_role`, { headers }),
+      fetch(`${baseUrl}/rest/v1/approvals?workspace_id=eq.${ws}&status=eq.pending&limit=5&select=title,approval_type`, { headers }),
+      fetch(`${baseUrl}/rest/v1/ranked_memories?workspace_id=eq.${ws}&order=effective_importance.desc&limit=5&select=memory_text`, { headers }),
+    ]);
+    const [tasks, approvals, memories] = await Promise.all([
+      tasksRes.ok ? tasksRes.json() : [],
+      approvalsRes.ok ? approvalsRes.json() : [],
+      memoriesRes.ok ? memoriesRes.json() : [],
+    ]);
+
+    const parts = [`### ${ws}`];
+    if (tasks.length) {
+      parts.push("Active tasks:");
+      tasks.forEach((t: any) => parts.push(`  - [${t.status}] ${t.title} (U${t.urgency_score}×I${t.impact_score})`));
+    } else {
+      parts.push("No active tasks.");
+    }
+    if (approvals.length) {
+      parts.push("Pending approvals:");
+      approvals.forEach((a: any) => parts.push(`  - ${a.title} (${a.approval_type})`));
+    }
+    if (memories.length) {
+      parts.push("Recent context:");
+      memories.forEach((m: any) => parts.push(`  - ${m.memory_text}`));
+    }
+    contextParts.push(parts.join("\n"));
+  }));
+
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric",
+  });
+
+  const systemPrompt = `You are Jon Morrison's Chief of Staff. Today is ${today}.
+
+## Cross-Workspace State
+
+${contextParts.join("\n\n")}
+
+## Your Job
+
+Pre-populate Jon's daily standup with 3-5 queued tasks across his workspaces so they're ready when he opens the app.
+
+Respond in JSON:
+{
+  "tasks": [
+    {
+      "workspace_id": "bloomsuite",
+      "agent_role": "bloomsuite",
+      "title": "Short specific action title",
+      "description": "What to do and why",
+      "task_type": "content_draft | outreach | research | analysis | build",
+      "urgency_score": 4,
+      "impact_score": 5
+    }
+  ]
+}
+
+Rules:
+- Maximum 5 tasks total
+- At least one per workspace with real active work
+- Be specific and actionable
+- Return raw JSON only`;
+
+  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: "Generate today's prioritized tasks for Jon's standup." },
+      ],
+    }),
+  });
+
+  if (!aiResponse.ok) {
+    const errText = await aiResponse.text();
+    throw new Error(`AI error: ${aiResponse.status} ${errText}`);
+  }
+
+  const aiData = await aiResponse.json();
+  const rawText = aiData.choices?.[0]?.message?.content || "";
+
+  let parsed: any = { tasks: [] };
+  try {
+    const cleaned = rawText.replace(/```json\s*\n?|```\s*$/g, "").trim();
+    parsed = JSON.parse(cleaned);
+  } catch {
+    console.error("[scheduled-standup] Failed to parse executive response");
+    return { message: "Failed to parse executive response", tasksCreated: 0 };
+  }
+
+  const taskRows = (parsed.tasks || []).slice(0, 5).map((t: any) => ({
+    workspace_id: t.workspace_id,
+    agent_role: t.agent_role || t.workspace_id,
+    title: (t.title || "Untitled").slice(0, 120),
+    description: t.description || null,
+    task_type: t.task_type || "general",
+    urgency_score: t.urgency_score || 3,
+    impact_score: t.impact_score || 3,
+    status: "queued",
+    source: "scheduled_standup",
+    created_by: "executive",
+    depth: 0,
+  }));
+
+  const count = await insertBatch("tasks", taskRows);
+  console.log(`[scheduled-standup] Created ${count} tasks for today's standup`);
+  return { message: `Pre-populated ${count} tasks for standup`, tasksCreated: count };
+}
+
+// ─── MAIN HANDLER ───────────────────────────────────────────────────────────
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    const body = await req.json().catch(() => ({}));
+    const isScheduledStandup = body.trigger === "scheduled_standup";
+
+    // Handle scheduled standup separately
+    if (isScheduledStandup) {
+      console.log("[run-tasks] Triggered by scheduled standup cron");
+      const result = await runScheduledStandup();
+      return new Response(
+        JSON.stringify(result),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN");
     if (!GITHUB_TOKEN) {
       return new Response(
