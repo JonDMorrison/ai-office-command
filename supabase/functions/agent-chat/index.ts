@@ -938,9 +938,10 @@ serve(async (req) => {
     const data = await response.json();
     const fullText = data.content?.[0]?.text || "No response generated.";
 
-    // Parse artifacts
+    // Parse and process artifacts
     const { message: chatMessage, artifacts } = extractArtifacts(fullText);
-    const artifactCounts = await processArtifacts(agentId, workspaceId, artifacts);
+    const parsedResponse = artifacts || {};
+    const artifactCounts = await processAgentArtifacts(parsedResponse, agentId, workspaceId);
 
     // Log output
     await logAgentOutput(agentId, workspaceId, chatMessage, artifactCounts, !!artifacts);
@@ -963,8 +964,12 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        text: chatMessage,
-        artifacts_created: artifactCounts,
+        message: chatMessage,
+        tasksCreated: artifactCounts.tasksCreated,
+        approvalsCreated: artifactCounts.approvalsCreated,
+        memoriesCreated: artifactCounts.memoriesCreated,
+        insightsCreated: artifactCounts.insightsCreated,
+        raw: parsedResponse,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
