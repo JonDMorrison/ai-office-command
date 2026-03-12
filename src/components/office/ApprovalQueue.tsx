@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { X, Check, XCircle, Mail, Share2, FileText, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Check, XCircle, Mail, Share2, FileText, Clock, ChevronDown, ChevronUp, Download, Copy, CheckCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { agents } from '@/data/agents';
+import { toast } from 'sonner';
 
 interface Approval {
   id: string;
   workspace_id: string;
   agent_role: string;
+  task_id: string | null;
   approval_type: string;
   title: string;
   preview_text: string | null;
@@ -33,6 +35,52 @@ const TYPE_CONFIG: Record<string, { label: string; icon: typeof Mail; color: str
 const getTypeConfig = (type: string) =>
   TYPE_CONFIG[type] || { label: type.replace(/_/g, ' '), icon: FileText, color: 'hsl(var(--primary))' };
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function getContentText(item: Approval): string {
+  const payload = item.full_payload as any;
+  return payload?.content || item.preview_text || item.title || '';
+}
+
+function downloadAsMarkdown(item: Approval) {
+  const content = getContentText(item);
+  const agent = agents.find(a => a.id === item.agent_role);
+  const header = `# ${item.title}\n\n**Agent:** ${agent?.name || item.agent_role}\n**Type:** ${item.approval_type}\n**Date:** ${new Date(item.created_at).toLocaleDateString()}\n\n---\n\n`;
+  const blob = new Blob([header + content], { type: 'text/markdown' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${item.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function copyToClipboard(item: Approval) {
+  const content = getContentText(item);
+  await navigator.clipboard.writeText(content);
+  toast.success('Copied to clipboard');
+}
+
+/** Log an approval decision back to task_events so the originating agent gets feedback */
+async function feedbackToAgent(item: Approval, decision: 'approved' | 'rejected') {
+  // If the approval is linked to a task, log an event on that task
+  if (item.task_id) {
+    await (supabase.from('task_events' as any).insert({
+      task_id: item.task_id,
+      event_type: decision === 'approved' ? 'approval_approved' : 'approval_rejected',
+      event_payload: {
+        approval_id: item.id,
+        approval_type: item.approval_type,
+        title: item.title,
+        decision,
+        note: `Jon ${decision} "${item.title}"`,
+      },
+    } as any));
+  }
+}
+
+// ─── Card ───────────────────────────────────────────────────────────────────
+
 const ApprovalCard = ({
   item,
   isExpanded,
@@ -48,15 +96,24 @@ const ApprovalCard = ({
   onReject: () => void;
   isProcessing: boolean;
 }) => {
+  const [copied, setCopied] = useState(false);
   const agent = agents.find(a => a.id === item.agent_role);
   const config = getTypeConfig(item.approval_type);
   const Icon = config.icon;
   const isPending = item.status === 'pending';
+  const isApproved = item.status === 'approved';
+  const hasContent = !!(getContentText(item));
+
+  const handleCopy = async () => {
+    await copyToClipboard(item);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   return (
     <div
       className={`bg-card rounded-xl p-4 border border-border shadow-sm transition-all duration-300 ${
-        !isPending ? 'opacity-50 scale-[0.98]' : ''
+        !isPending ? 'opacity-75' : ''
       }`}
     >
       {/* Header */}
@@ -98,10 +155,9 @@ const ApprovalCard = ({
         </p>
       )}
 
-      {/* Expanded full payload */}
+      {/* Expanded full content */}
       {isExpanded && (
         <div className="mb-3 space-y-2">
-          {/* Show content field first if available */}
           {(item.full_payload as any)?.content && (
             <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
               <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
@@ -109,7 +165,6 @@ const ApprovalCard = ({
               </p>
             </div>
           )}
-          {/* Fall back to raw JSON if no content field */}
           {!(item.full_payload as any)?.content && Object.keys(item.full_payload).length > 0 && (
             <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
               <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
@@ -141,13 +196,39 @@ const ApprovalCard = ({
           </button>
         </div>
       ) : (
-        <div className={`text-xs font-medium ${item.status === 'approved' ? 'text-primary' : 'text-destructive'}`}>
-          {item.status === 'approved' ? '✅ Approved' : '❌ Rejected'}
+        <div className="flex items-center justify-between">
+          <div className={`text-xs font-medium ${isApproved ? 'text-emerald-600' : 'text-destructive'}`}>
+            {isApproved ? '✅ Approved' : '❌ Rejected'}
+          </div>
+          {/* Post-approval actions for approved items */}
+          {isApproved && hasContent && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={handleCopy}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium
+                  bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
+                title="Copy content"
+              >
+                {copied ? <CheckCheck size={10} /> : <Copy size={10} />}
+                {copied ? 'Copied' : 'Copy'}
+              </button>
+              <button
+                onClick={() => downloadAsMarkdown(item)}
+                className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium
+                  bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
+                title="Download as markdown"
+              >
+                <Download size={10} /> Export
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
 };
+
+// ─── Queue ───────────────────────────────────────────────────────────────────
 
 const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
   const [approvals, setApprovals] = useState<Approval[]>([]);
@@ -174,48 +255,46 @@ const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
 
   useEffect(() => {
     loadApprovals();
-
-    // Realtime — update panel live when agents create approvals
     const channel = supabase
       .channel('approvals-realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'approvals' },
-        () => loadApprovals()
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'approvals' }, () => loadApprovals())
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleApprove = async (item: Approval) => {
     setProcessingId(item.id);
     try {
-      // For email drafts, save to Gmail via edge function
+      // For email drafts, save to Gmail
       if (item.approval_type === 'email_draft') {
-        await supabase.functions.invoke('save-gmail-draft', {
-          body: {
-            workspaceId: item.workspace_id,
-            payload: item.full_payload,
-          },
+        const { error: fnError } = await supabase.functions.invoke('save-gmail-draft', {
+          body: { workspaceId: item.workspace_id, payload: item.full_payload },
         });
+        if (fnError) {
+          console.error('Gmail draft save failed:', fnError);
+          toast.error('Could not save Gmail draft — approved anyway');
+        } else {
+          toast.success('Email draft saved to Gmail');
+        }
       }
 
+      // Mark approved
       await (supabase
         .from('approvals' as any)
-        .update({
-          status: 'approved',
-          approved_at: new Date().toISOString(),
-        } as any)
+        .update({ status: 'approved', approved_at: new Date().toISOString() } as any)
         .eq('id', item.id) as any);
+
+      // Feed decision back to originating agent
+      await feedbackToAgent(item, 'approved');
 
       setApprovals(prev =>
         prev.map(a => a.id === item.id ? { ...a, status: 'approved', approved_at: new Date().toISOString() } : a)
       );
+
+      toast.success(`Approved: ${item.title}`);
     } catch (err) {
       console.error('Failed to approve:', err);
+      toast.error('Failed to approve');
     } finally {
       setProcessingId(null);
     }
@@ -226,15 +305,17 @@ const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
     try {
       await (supabase
         .from('approvals' as any)
-        .update({
-          status: 'rejected',
-          rejected_at: new Date().toISOString(),
-        } as any)
+        .update({ status: 'rejected', rejected_at: new Date().toISOString() } as any)
         .eq('id', id) as any);
+
+      const item = approvals.find(a => a.id === id);
+      if (item) await feedbackToAgent(item, 'rejected');
 
       setApprovals(prev =>
         prev.map(a => a.id === id ? { ...a, status: 'rejected', rejected_at: new Date().toISOString() } : a)
       );
+
+      toast.info('Rejected');
     } catch (err) {
       console.error('Failed to reject:', err);
     } finally {
@@ -276,9 +357,7 @@ const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="text-2xl mb-2">✨</div>
             <p className="text-sm font-medium text-foreground">All clear</p>
-            <p className="text-xs text-muted-foreground mt-1">
-              No items waiting for approval
-            </p>
+            <p className="text-xs text-muted-foreground mt-1">No items waiting for approval</p>
           </div>
         ) : (
           <>
