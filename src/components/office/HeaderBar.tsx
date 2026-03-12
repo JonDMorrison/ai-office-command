@@ -4,9 +4,11 @@ interface HeaderBarProps {
   activeCount: number;
   waitingCount: number;
   onStartStandup?: () => void;
+  pendingApprovals?: number;
+  onOpenApprovals?: () => void;
 }
 
-const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps) => {
+const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals = 0, onOpenApprovals }: HeaderBarProps) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -39,6 +41,19 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps
             className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-accent hover:shadow-sm transition-all"
           >
             ☀️ Daily Standup
+          </button>
+        )}
+        {onOpenApprovals && (
+          <button
+            onClick={onOpenApprovals}
+            className="relative px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary text-foreground border border-border hover:bg-accent hover:shadow-sm transition-all"
+          >
+            📋 Approvals
+            {pendingApprovals > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold flex items-center justify-center">
+                {pendingApprovals}
+              </span>
+            )}
           </button>
         )}
         <div className="flex items-center gap-2">

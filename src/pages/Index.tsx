@@ -2,29 +2,35 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
 import { useTasks } from '@/hooks/useTasks';
+import { useApprovals } from '@/hooks/useApprovals';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel from '@/components/office/ChatPanel';
 import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
+import ApprovalQueue from '@/components/office/ApprovalQueue';
 
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [showSkills, setShowSkills] = useState(false);
   const [standupActive, setStandupActive] = useState(false);
+  const [showApprovals, setShowApprovals] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
   const { tasks, fetchTasks, createTask } = useTasks();
+  const { pendingCount, fetchApprovals } = useApprovals();
   const followUpNotes = useRef<Record<string, string>>({});
 
-  // Load persisted tasks on mount
+  // Load persisted data on mount
   useEffect(() => {
     fetchTasks({ status: 'approved' });
-  }, [fetchTasks]);
+    fetchApprovals({ status: 'pending' });
+  }, [fetchTasks, fetchApprovals]);
 
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
+    if (showApprovals) setShowApprovals(false);
   };
 
   const handleStandupApproved = useCallback((approvedIds: string[], followUps: Record<string, string>) => {
@@ -35,6 +41,11 @@ const Index = () => {
   const handleStandupDismiss = useCallback(() => {
     setStandupActive(false);
   }, []);
+
+  const handleOpenApprovals = useCallback(() => {
+    setShowApprovals(prev => !prev);
+    if (selectedAgentId) setSelectedAgentId(null);
+  }, [selectedAgentId]);
 
   // Desk positions: U-shape layout
   const deskPositions = [
@@ -47,7 +58,13 @@ const Index = () => {
 
   return (
     <div className="flex flex-col h-screen bg-background">
-      <HeaderBar activeCount={activeCount} waitingCount={waitingCount} onStartStandup={() => setStandupActive(true)} />
+      <HeaderBar
+        activeCount={activeCount}
+        waitingCount={waitingCount}
+        onStartStandup={() => setStandupActive(true)}
+        pendingApprovals={pendingCount}
+        onOpenApprovals={handleOpenApprovals}
+      />
 
       <div className="flex flex-1 overflow-hidden">
         {/* Isometric office floor */}
@@ -102,13 +119,17 @@ const Index = () => {
 
         </div>
 
-        {selectedAgent && (
+        {selectedAgent && !showApprovals && (
           <ChatPanel
             agent={selectedAgent}
             onClose={() => setSelectedAgentId(null)}
             onOpenSkills={() => setShowSkills(true)}
             initialNote={followUpNotes.current[selectedAgent.id]}
           />
+        )}
+
+        {showApprovals && (
+          <ApprovalQueue onClose={() => setShowApprovals(false)} />
         )}
       </div>
 
