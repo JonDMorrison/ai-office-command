@@ -768,6 +768,8 @@ async function processAgentArtifacts(
         body: JSON.stringify({
           workspace_id: workspaceId,
           agent_role: task.agent_role || agentId,
+          assigned_agent: task.agent_role || agentId,
+          created_by_agent: agentId,
           title: (task.title || "Untitled").slice(0, 120),
           description: task.description || "",
           status: "pending",
