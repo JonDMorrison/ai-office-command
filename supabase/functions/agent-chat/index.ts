@@ -696,12 +696,13 @@ async function processAgentArtifacts(
   parsed: any,
   agentId: string,
   workspaceId: string | null
-): Promise<{ tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }> {
+): Promise<{ tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number; delegationsCreated: number }> {
 
   let tasksCreated = 0;
   let approvalsCreated = 0;
   let memoriesCreated = 0;
   let insightsCreated = 0;
+  let delegationsCreated = 0;
 
   const baseUrl = getSupabaseUrl();
   const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
