@@ -218,6 +218,7 @@ export type Database = {
           created_at: string
           full_payload: Json
           id: string
+          posted_at: string | null
           preview_text: string | null
           rejected_at: string | null
           status: string
@@ -233,6 +234,7 @@ export type Database = {
           created_at?: string
           full_payload?: Json
           id?: string
+          posted_at?: string | null
           preview_text?: string | null
           rejected_at?: string | null
           status?: string
@@ -248,6 +250,7 @@ export type Database = {
           created_at?: string
           full_payload?: Json
           id?: string
+          posted_at?: string | null
           preview_text?: string | null
           rejected_at?: string | null
           status?: string

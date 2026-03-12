@@ -1,0 +1,1 @@
+ALTER TABLE public.approvals ADD COLUMN IF NOT EXISTS posted_at timestamptz NULL;

@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { Link } from 'react-router-dom';
 
 interface HeaderBarProps {
   activeCount: number;
@@ -14,6 +15,19 @@ interface HeaderBarProps {
 const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals = 0, onOpenApprovals, onTasksRan }: HeaderBarProps) => {
   const [time, setTime] = useState(new Date());
   const [runningTasks, setRunningTasks] = useState(false);
+  const [readyToPostCount, setReadyToPostCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await (supabase
+        .from('approvals' as any)
+        .select('*', { count: 'exact', head: true }) as any)
+        .eq('status', 'approved')
+        .eq('approval_type', 'social_post');
+      setReadyToPostCount(count || 0);
+    };
+    fetchCount();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000);
@@ -89,6 +103,19 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals
             Daily Standup
           </button>
         )}
+
+        {/* Ready to Post */}
+        <Link
+          to="/ready-to-post"
+          className="relative px-3 py-1.5 rounded-lg text-[11px] font-semibold text-foreground border border-border hover:bg-secondary transition-all"
+        >
+          📋 Ready to Post
+          {readyToPostCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+              {readyToPostCount}
+            </span>
+          )}
+        </Link>
 
         {/* Approvals */}
         {onOpenApprovals && (
