@@ -64,6 +64,8 @@ export function useTasks() {
       const row = {
         workspace_id: workspaceId,
         agent_role: task.agent_role,
+        assigned_agent: task.agent_role,
+        created_by_agent: task.source === 'standup' ? 'executive' : (task.source || 'jon'),
         title: task.title,
         description: task.description || null,
         task_type: task.task_type || 'general',

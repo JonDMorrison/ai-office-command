@@ -680,6 +680,8 @@ Rules:
   const taskRows = (parsed.tasks || []).slice(0, 5).map((t: any) => ({
     workspace_id: t.workspace_id,
     agent_role: t.agent_role || t.workspace_id,
+    assigned_agent: t.agent_role || t.workspace_id,
+    created_by_agent: "executive",
     title: (t.title || "Untitled").slice(0, 120),
     description: t.description || null,
     task_type: t.task_type || "general",

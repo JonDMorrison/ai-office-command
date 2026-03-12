@@ -916,6 +916,8 @@ async function processAgentArtifacts(
         body: JSON.stringify({
           workspace_id: targetWorkspace,
           agent_role: targetAgent,
+          assigned_agent: targetAgent,
+          created_by_agent: agentId,
           title: (delegation.title || "Delegated task").slice(0, 120),
           description: delegation.description || `Delegated from ${agentId}`,
           status: "pending",
