@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { agents } from '@/data/agents';
 import { useAgentStates } from '@/hooks/useAgentStates';
+import { useTasks } from '@/hooks/useTasks';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel from '@/components/office/ChatPanel';
@@ -14,7 +15,13 @@ const Index = () => {
   const [standupActive, setStandupActive] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
+  const { tasks, fetchTasks, createTask } = useTasks();
   const followUpNotes = useRef<Record<string, string>>({});
+
+  // Load persisted tasks on mount
+  useEffect(() => {
+    fetchTasks({ status: 'approved' });
+  }, [fetchTasks]);
 
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
@@ -89,6 +96,7 @@ const Index = () => {
             <DailyStandup
               onApproved={handleStandupApproved}
               onDismiss={handleStandupDismiss}
+              onCreateTask={createTask}
             />
           )}
 
