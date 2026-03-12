@@ -15,9 +15,8 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Build a concise image prompt from the post text
-    const words = postText.split(/\s+/).slice(0, 40).join(" ");
-    const imagePrompt = `${words}. Professional, modern, clean design. Social media post style. No text overlays. Warm brand colors. On a clean background.`;
+    // Use the prompt directly — the client now sends a fully-formed template prompt
+    const imagePrompt = postText;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
