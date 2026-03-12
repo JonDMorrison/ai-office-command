@@ -14,6 +14,7 @@ interface ChatPanelProps {
 interface Message {
   role: 'user' | 'assistant';
   content: string;
+  artifacts?: { tasks: number; approvals: number; memories: number; insights: number };
 }
 
 const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps) => {
@@ -60,9 +61,10 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
 
       if (error) throw error;
 
+      const artifacts = data.artifacts_created || undefined;
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.text || 'No response.' },
+        { role: 'assistant', content: data.text || 'No response.', artifacts },
       ]);
     } catch (err) {
       console.error('Chat error:', err);
@@ -111,7 +113,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {messages.map((msg, i) => (
-          <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
             <div
               className={`max-w-[85%] px-3.5 py-2.5 text-sm leading-relaxed ${
                 msg.role === 'user'
@@ -127,6 +129,20 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
                 msg.content
               )}
             </div>
+            {msg.artifacts && (msg.artifacts.tasks > 0 || msg.artifacts.approvals > 0) && (
+              <div className="flex gap-1.5 mt-1 px-1">
+                {msg.artifacts.tasks > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                    📋 {msg.artifacts.tasks} task{msg.artifacts.tasks > 1 ? 's' : ''}
+                  </span>
+                )}
+                {msg.artifacts.approvals > 0 && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                    ✋ {msg.artifacts.approvals} approval{msg.artifacts.approvals > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         ))}
         {isTyping && (

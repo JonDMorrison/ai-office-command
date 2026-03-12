@@ -14,6 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_insights: {
+        Row: {
+          agent_role: string
+          category: string
+          company_id: string
+          created_at: string
+          id: string
+          insight_text: string
+          source_task_id: string | null
+        }
+        Insert: {
+          agent_role: string
+          category?: string
+          company_id: string
+          created_at?: string
+          id?: string
+          insight_text: string
+          source_task_id?: string | null
+        }
+        Update: {
+          agent_role?: string
+          category?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          insight_text?: string
+          source_task_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_insights_source_task_id_fkey"
+            columns: ["source_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_memories: {
+        Row: {
+          agent_role: string
+          company_id: string
+          created_at: string
+          expires_at: string | null
+          id: string
+          memory_text: string
+          memory_type: string
+          relevance_score: number
+          source: string
+        }
+        Insert: {
+          agent_role: string
+          company_id: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          memory_text: string
+          memory_type?: string
+          relevance_score?: number
+          source?: string
+        }
+        Update: {
+          agent_role?: string
+          company_id?: string
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          memory_text?: string
+          memory_type?: string
+          relevance_score?: number
+          source?: string
+        }
+        Relationships: []
+      }
+      agent_outputs: {
+        Row: {
+          agent_role: string
+          approvals_created: number
+          company_id: string
+          conversation_id: string | null
+          created_at: string
+          id: string
+          insights_created: number
+          memories_created: number
+          parse_success: boolean
+          raw_message: string
+          tasks_created: number
+        }
+        Insert: {
+          agent_role: string
+          approvals_created?: number
+          company_id: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          insights_created?: number
+          memories_created?: number
+          parse_success?: boolean
+          raw_message: string
+          tasks_created?: number
+        }
+        Update: {
+          agent_role?: string
+          approvals_created?: number
+          company_id?: string
+          conversation_id?: string | null
+          created_at?: string
+          id?: string
+          insights_created?: number
+          memories_created?: number
+          parse_success?: boolean
+          raw_message?: string
+          tasks_created?: number
+        }
+        Relationships: []
+      }
       agent_skills: {
         Row: {
           agent_id: string

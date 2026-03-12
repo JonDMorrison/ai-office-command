@@ -46,13 +46,41 @@ const OPERATIONAL_RULES = `## Operational Rules
 - Prefer turning work into trackable outputs (tasks, drafts, approval items) over conversational promises.`;
 
 // ─── OUTPUT GUIDANCE ────────────────────────────────────────────────────────
-const OUTPUT_GUIDANCE = `## Output Guidance
-Structure your responses to include:
-1. **Direct answer** — address the user's question or request immediately.
-2. **Task suggestions** — if follow-up work is needed, propose specific next steps.
-3. **Approval candidates** — if you've drafted a social post, email, or any public-facing content, clearly mark it as needing approval.
+const OUTPUT_GUIDANCE = `## Structured Output
 
-When drafting emails, use the [DRAFT]...[/DRAFT] block format. When suggesting social posts, present them clearly with platform, caption, and any media notes.`;
+Write your conversational response naturally. Then, if your response involves any of the following, append a fenced JSON block at the VERY END:
+
+- Work that should be tracked → \`suggested_tasks\`
+- Outbound email or social content → \`suggested_approvals\`
+- A preference, fact, or decision worth remembering → \`suggested_memories\`
+- A market, product, or audience observation → \`insights\`
+
+Format (only include arrays that have items):
+
+\\\`\\\`\\\`json
+{
+  "suggested_tasks": [
+    { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "priority": 2 }
+  ],
+  "suggested_approvals": [
+    { "approval_type": "social_post|email_draft|public_content", "title": "What Jon sees", "preview_text": "The full draft content", "platform": "linkedin" }
+  ],
+  "suggested_memories": [
+    "Short declarative statement about a preference, fact, pattern, or decision"
+  ],
+  "insights": [
+    "Observation about market, product, audience, or operations"
+  ]
+}
+\\\`\\\`\\\`
+
+Rules:
+- The JSON block must be the LAST thing in your response.
+- If the conversation is simple Q&A, do NOT append JSON.
+- Tasks: verb-led, specific, actionable.
+- Approvals: REQUIRED for any outbound email, social post, or public content. Include the full draft in preview_text.
+- Memories: only for genuinely useful facts/preferences, not trivial details.
+- When drafting emails, ALSO use the [DRAFT]...[/DRAFT] block format for Gmail integration.`;
 
 // ─── PROMPT SCAFFOLD BUILDER ────────────────────────────────────────────────
 
@@ -372,6 +400,156 @@ async function buildInboxAgentContext(): Promise<string> {
   return summary + draftInstructions;
 }
 
+// ─── ARTIFACT EXTRACTION & PROCESSING ───────────────────────────────────────
+
+const COMPANY_ID = "joncoach";
+
+interface ParsedArtifacts {
+  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number }>;
+  suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string; full_payload?: Record<string, unknown> }>;
+  suggested_memories?: string[];
+  insights?: string[];
+}
+
+interface ArtifactCounts {
+  tasks: number;
+  approvals: number;
+  memories: number;
+  insights: number;
+}
+
+function extractArtifacts(fullText: string): { message: string; artifacts: ParsedArtifacts | null } {
+  // Look for a ```json block at the end of the response
+  const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```\s*$/;
+  const match = fullText.match(jsonBlockRegex);
+
+  if (!match) {
+    return { message: fullText, artifacts: null };
+  }
+
+  const message = fullText.slice(0, match.index).trim();
+  try {
+    const parsed = JSON.parse(match[1]);
+    console.log(`[artifacts] Parsed JSON block with keys: ${Object.keys(parsed).join(", ")}`);
+    return { message, artifacts: parsed as ParsedArtifacts };
+  } catch (e) {
+    console.error("[artifacts] Failed to parse JSON block:", e);
+    return { message: fullText, artifacts: null };
+  }
+}
+
+async function processArtifacts(agentId: string, artifacts: ParsedArtifacts | null): Promise<ArtifactCounts> {
+  const counts: ArtifactCounts = { tasks: 0, approvals: 0, memories: 0, insights: 0 };
+  if (!artifacts) return counts;
+
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+  const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+  if (!supabaseUrl || !supabaseKey) {
+    console.error("[artifacts] Missing SUPABASE_URL or SERVICE_ROLE_KEY");
+    return counts;
+  }
+
+  const headers = {
+    apikey: supabaseKey,
+    Authorization: `Bearer ${supabaseKey}`,
+    "Content-Type": "application/json",
+    Prefer: "return=minimal",
+  };
+
+  const insertBatch = async (table: string, rows: Record<string, unknown>[]) => {
+    if (rows.length === 0) return 0;
+    const res = await fetch(`${supabaseUrl}/rest/v1/${table}`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(rows),
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      console.error(`[artifacts] Failed to insert into ${table}: ${res.status} ${err}`);
+      return 0;
+    }
+    return rows.length;
+  };
+
+  // Process all artifact types in parallel
+  const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+    // Tasks
+    insertBatch("tasks", (artifacts.suggested_tasks || []).map(t => ({
+      company_id: COMPANY_ID,
+      agent_role: agentId,
+      title: (t.title || "Untitled").slice(0, 120),
+      description: t.description || null,
+      task_type: t.task_type || "general",
+      priority: t.priority || 3,
+      status: "queued",
+      source: "agent_output",
+    }))),
+    // Approvals
+    insertBatch("approvals", (artifacts.suggested_approvals || []).map(a => ({
+      company_id: COMPANY_ID,
+      agent_role: agentId,
+      approval_type: a.approval_type || "general",
+      title: a.title || "Untitled",
+      preview_text: a.preview_text || null,
+      full_payload: a.full_payload || { platform: a.platform },
+      status: "pending",
+    }))),
+    // Memories
+    insertBatch("agent_memories", (artifacts.suggested_memories || []).map(m => ({
+      company_id: COMPANY_ID,
+      agent_role: agentId,
+      memory_text: m,
+      memory_type: "preference",
+      source: "conversation",
+    }))),
+    // Insights
+    insertBatch("agent_insights", (artifacts.insights || []).map(i => ({
+      company_id: COMPANY_ID,
+      agent_role: agentId,
+      insight_text: i,
+      category: "general",
+    }))),
+  ]);
+
+  counts.tasks = taskCount;
+  counts.approvals = approvalCount;
+  counts.memories = memoryCount;
+  counts.insights = insightCount;
+
+  console.log(`[artifacts] Created: ${counts.tasks} tasks, ${counts.approvals} approvals, ${counts.memories} memories, ${counts.insights} insights`);
+  return counts;
+}
+
+async function logAgentOutput(agentId: string, message: string, counts: ArtifactCounts, parseSuccess: boolean) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return;
+
+    await fetch(`${supabaseUrl}/rest/v1/agent_outputs`, {
+      method: "POST",
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        company_id: COMPANY_ID,
+        agent_role: agentId,
+        raw_message: message.slice(0, 5000),
+        tasks_created: counts.tasks,
+        approvals_created: counts.approvals,
+        memories_created: counts.memories,
+        insights_created: counts.insights,
+        parse_success: parseSuccess,
+      }),
+    });
+  } catch (e) {
+    console.error("[artifacts] Failed to log output:", e);
+  }
+}
+
 // ─── MAIN HANDLER ───────────────────────────────────────────────────────────
 
 serve(async (req) => {
@@ -454,11 +632,18 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const text = data.content?.[0]?.text || "No response generated.";
+    const fullText = data.content?.[0]?.text || "No response generated.";
+
+    // Parse artifacts from response
+    const { message: chatMessage, artifacts } = extractArtifacts(fullText);
+    const artifactCounts = await processArtifacts(agentId, artifacts);
+
+    // Log the output
+    await logAgentOutput(agentId, chatMessage, artifactCounts, !!artifacts);
 
     // Post-processing: save Gmail drafts if applicable
     if (agentId === "inbox" || agentId === "bloomsuite") {
-      const drafts = parseDraftBlocks(text);
+      const drafts = parseDraftBlocks(fullText);
       if (drafts.length > 0) {
         try {
           const accessToken = agentId === "bloomsuite"
@@ -473,7 +658,10 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ text }),
+      JSON.stringify({
+        text: chatMessage,
+        artifacts_created: artifactCounts,
+      }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (e) {
