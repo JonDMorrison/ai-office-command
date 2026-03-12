@@ -279,32 +279,58 @@
   border-radius: 50% 50% 30% 30%;
 }
 
-/* Agent breathing idle */
-@keyframes agent-breathe {
+/* ===== STATE ANIMATIONS ===== */
+
+/* 1. Idle breathing — gentle float + scale pulse */
+@keyframes idle-breathe {
   0%, 100% { transform: translateY(0px) scale(1); }
-  50% { transform: translateY(-2px) scale(1.01); }
+  50% { transform: translateY(-2px) scale(1.008); }
 }
 
-/* Agent typing animation */
-@keyframes agent-type-img {
+/* 2. Typing — rapid micro-shifts simulating arm movement + monitor glow pulse */
+@keyframes typing-shift {
   0%, 100% { transform: translateY(0) rotate(0deg); }
-  30% { transform: translateY(-1.5px) rotate(-0.8deg); }
-  70% { transform: translateY(-1.5px) rotate(0.8deg); }
+  20% { transform: translateY(-1px) rotate(-0.6deg); }
+  40% { transform: translateY(0.5px) rotate(0.4deg); }
+  60% { transform: translateY(-1px) rotate(-0.3deg); }
+  80% { transform: translateY(0) rotate(0.5deg); }
 }
 
-/* Agent reading */
-@keyframes agent-read {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-1px) rotate(1deg); }
+@keyframes monitor-glow-pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* 3. Thinking — slow head tilt side to side */
+@keyframes thinking-tilt {
+  0%, 100% { transform: translateY(-1px) rotate(0deg); }
+  25% { transform: translateY(-2px) rotate(-2deg); }
+  75% { transform: translateY(-2px) rotate(2deg); }
+}
+
+/* 4. Approval waiting — speech bubble bounce */
+@keyframes bubble-bounce {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  25% { transform: translateX(-50%) translateY(-3px); }
+  50% { transform: translateX(-50%) translateY(0); }
+  75% { transform: translateX(-50%) translateY(-2px); }
+}
+
+/* 5. Delegation — envelope flying between desks */
+@keyframes envelope-fly {
+  0% { transform: translate(0, 0) scale(1) rotate(0deg); opacity: 1; }
+  30% { transform: translate(20px, -30px) scale(1.1) rotate(-8deg); opacity: 1; }
+  70% { transform: translate(60px, -20px) scale(0.9) rotate(5deg); opacity: 0.8; }
+  100% { transform: translate(100px, 0) scale(0.7) rotate(0deg); opacity: 0; }
 }
 
 /* Speech bubble fade */
 @keyframes bubble-appear {
-  0% { opacity: 0; transform: translateY(5px) scale(0.9); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
+  0% { opacity: 0; transform: translateX(-50%) translateY(5px) scale(0.9); }
+  100% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 }
 
-/* Status pulse */
+/* Status dot pulse */
 @keyframes status-pulse {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(0.8); }
@@ -316,16 +342,41 @@
   51%, 100% { opacity: 0; }
 }
 
-.animate-agent-breathe {
-  animation: agent-breathe 3s ease-in-out infinite;
+/* Walk sway */
+@keyframes walk-sway {
+  0%, 100% { transform: rotate(-5deg) translateY(0px); }
+  50% { transform: rotate(5deg) translateY(-2px); }
 }
 
-.animate-agent-type {
-  animation: agent-type-img 0.25s ease-in-out infinite;
+/* Daily Standup walk */
+@keyframes standup-walk {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-3deg); }
+  75% { transform: rotate(3deg); }
 }
 
-.animate-agent-read {
-  animation: agent-read 4s ease-in-out infinite;
+/* Idle float (legacy compat) */
+@keyframes idle-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-2px); }
+}
+
+/* ===== Animation Classes ===== */
+
+.animate-idle-breathe {
+  animation: idle-breathe 3s ease-in-out infinite;
+}
+
+.animate-typing {
+  animation: typing-shift 0.35s ease-in-out infinite;
+}
+
+.animate-thinking {
+  animation: thinking-tilt 2.5s ease-in-out infinite;
+}
+
+.animate-bubble-bounce {
+  animation: bubble-bounce 1.2s ease-in-out infinite;
 }
 
 .animate-bubble-appear {
@@ -338,6 +389,49 @@
 
 .animate-cursor-blink {
   animation: cursor-blink 1s step-end infinite;
+}
+
+.animate-standup-walk {
+  animation: standup-walk 0.4s ease-in-out infinite;
+}
+
+.animate-envelope-fly {
+  animation: envelope-fly 1.2s ease-in-out forwards;
+}
+
+/* Monitor glow pulse when typing */
+.monitor-glow-active {
+  animation: monitor-glow-pulse 0.8s ease-in-out infinite;
+}
+
+/* ===== Executive Desk (Chief of Staff) ===== */
+.desk-pod.executive-desk {
+  transform: scale(1.12);
+}
+
+.desk-pod.executive-desk:hover {
+  transform: scale(1.16);
+}
+
+.desk-pod.executive-desk.selected {
+  transform: scale(1.18);
+}
+
+.desk-pod.executive-desk .iso-desk {
+  width: 180px;
+}
+
+.desk-pod.executive-desk .iso-desk-surface {
+  height: 52px;
+  background: linear-gradient(135deg, hsl(30 35% 72%) 0%, hsl(30 30% 64%) 100%);
+  box-shadow:
+    0 4px 0 hsl(30 25% 52%),
+    0 8px 20px hsl(30 20% 40% / 0.25);
+}
+
+.desk-pod.executive-desk .iso-monitor {
+  width: 46px;
+  height: 32px;
 }
 
 /* Scrollbar styling */
@@ -356,27 +450,4 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(30 15% 70%);
-}
-
-/* ===== Agent Idle Float ===== */
-@keyframes idle-float {
-  0%, 100% { transform: translateY(0px); }
-  50% { transform: translateY(-4px); }
-}
-
-/* ===== Agent Walk Sway ===== */
-@keyframes walk-sway {
-  0%, 100% { transform: rotate(-5deg) translateY(0px); }
-  50% { transform: rotate(5deg) translateY(-2px); }
-}
-
-/* ===== Daily Standup Walk Animation ===== */
-@keyframes standup-walk {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-3deg); }
-  75% { transform: rotate(3deg); }
-}
-
-.animate-standup-walk {
-  animation: standup-walk 0.4s ease-in-out infinite;
 }
