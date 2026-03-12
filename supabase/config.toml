@@ -8,3 +8,9 @@ verify_jwt = false
 
 [functions.daily-standup]
 verify_jwt = false
+
+[functions.generate-post-image]
+verify_jwt = false
+
+[functions.get-posted-approvals]
+verify_jwt = false
