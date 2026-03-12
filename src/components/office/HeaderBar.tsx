@@ -8,7 +8,7 @@ interface HeaderBarProps {
   onOpenApprovals?: () => void;
 }
 
-const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps) => {
+const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals = 0, onOpenApprovals }: HeaderBarProps) => {
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
