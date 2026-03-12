@@ -138,6 +138,8 @@ const Index = () => {
         )}
       </div>
 
+      <ActivityFeed />
+
       <StatusBar
         states={states}
         selectedAgentId={selectedAgentId}
