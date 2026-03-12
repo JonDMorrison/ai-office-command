@@ -344,10 +344,11 @@ You speak in practical, field-ready construction terms. You understand both the 
     ],
   },
   {
-    id: 'discprofile',
+    id: 'disc',
     name: 'DISC Profile',
     role: 'Personality Assessments & Team Dynamics',
     product: 'DISC Profile',
+    workspaceId: 'disc',
     colorVar: 'agent-disc',
     colorHex: '#a855f7',
     avatar: '🧠',
