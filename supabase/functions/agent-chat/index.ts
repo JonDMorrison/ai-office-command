@@ -151,9 +151,20 @@ function buildPromptScaffold(input: ScaffoldInput): string {
     sectionNames.push("G:Approvals(empty)");
   }
 
-  // H. Memory Placeholder
-  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
-  sectionNames.push("H:Memory");
+  // H. Relevant Memory
+  if (input.memories && input.memories.length > 0) {
+    sections.push(`## Relevant Memory\nThese are things you've learned from past conversations. Use them to personalize your responses and avoid asking Jon things he's already told you.\n\n${input.memories}`);
+    sectionNames.push("H:Memory(populated)");
+  } else {
+    sections.push(`## Relevant Memory\nNo memories stored yet. As you learn Jon's preferences and decisions, they will appear here.`);
+    sectionNames.push("H:Memory(empty)");
+  }
+
+  // H2. Relevant Insights
+  if (input.insights && input.insights.length > 0) {
+    sections.push(`## Relevant Insights\nObservations from past work that may inform your current response:\n\n${input.insights}`);
+    sectionNames.push("H2:Insights(populated)");
+  }
 
   // Inbox / Live Context (agent-specific, injected before skills)
   if (input.inboxContext) {
