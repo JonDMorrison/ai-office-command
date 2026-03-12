@@ -631,182 +631,207 @@ function extractArtifacts(fullText: string): { message: string; artifacts: Parse
   return { message: fullText, artifacts: null };
 }
 
-// ─── GUARDRAIL: Memory quality gate ─────────────────────────────────────────
+// ─── ARTIFACT PROCESSING WITH GUARDRAILS ────────────────────────────────────
 
-const MEMORY_TRIGGER_PHRASES = [
+const MEMORY_SIGNAL_PHRASES = [
   "jon prefers", "jon wants", "jon decided", "jon always",
   "jon never", "we agreed", "going forward", "jon said",
-  "jon likes", "jon dislikes", "jon chose", "the strategy is",
+  "jon likes", "jon dislikes", "jon needs", "important to jon",
+  "jon chose", "the strategy is",
 ];
 
-function shouldStoreMemory(memoryText: string): boolean {
-  const text = memoryText.toLowerCase();
-  const hasSignal = MEMORY_TRIGGER_PHRASES.some(p => text.includes(p));
-  const isGeneric = text.includes("likes clear") ||
-    text.includes("prefers good") ||
-    text.includes("wants quality") ||
-    text.length < 20;
-  if (!hasSignal) console.log(`[memory-gate] REJECTED (no signal): "${memoryText.slice(0, 80)}"`);
-  if (isGeneric) console.log(`[memory-gate] REJECTED (generic): "${memoryText.slice(0, 80)}"`);
-  return hasSignal && !isGeneric;
-}
-
-// ─── GUARDRAIL: Task deduplication ──────────────────────────────────────────
-
-async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+async function getTaskDepth(taskId: string): Promise<number> {
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
-  
-  let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&limit=20`;
-  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
-  
-  const res = await fetch(url, { headers });
+  const res = await fetch(`${baseUrl}/rest/v1/tasks?id=eq.${taskId}&select=depth&limit=1`, { headers });
+  if (!res.ok) return 0;
+  const data = await res.json();
+  return data?.[0]?.depth || 0;
+}
+
+async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+  if (!workspaceId) return null;
+
+  const keywords = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
+  if (keywords.length === 0) return null;
+
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  const res = await fetch(
+    `${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress)&select=id,title,status&limit=20`,
+    { headers }
+  );
   if (!res.ok) return null;
   const tasks = await res.json();
-  
-  const words = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
+
   return tasks?.find((t: any) =>
-    words.filter((word: string) => t.title.toLowerCase().includes(word)).length >= 2
+    keywords.some((word: string) => t.title.toLowerCase().includes(word))
   ) || null;
 }
 
-// ─── GUARDRAIL: Insight evidence filter ─────────────────────────────────────
+async function processAgentArtifacts(
+  parsed: any,
+  agentId: string,
+  workspaceId: string | null
+): Promise<{ tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }> {
 
-function parseInsight(raw: string | { insight_text: string; evidence?: string; signal_count?: number }): {
-  insight_text: string; evidence: string | null; signal_count: number;
-} {
-  if (typeof raw === "string") {
-    return { insight_text: raw, evidence: null, signal_count: 1 };
-  }
-  return {
-    insight_text: raw.insight_text,
-    evidence: raw.evidence || null,
-    signal_count: raw.signal_count || 1,
-  };
-}
-
-function shouldStoreInsight(parsed: { evidence: string | null; signal_count: number }): boolean {
-  if (!parsed.evidence || parsed.evidence.length < 5) {
-    console.log(`[insight-gate] REJECTED (no evidence)`);
-    return false;
-  }
-  if (parsed.signal_count < 2) {
-    console.log(`[insight-gate] REJECTED (signal_count < 2)`);
-    return false;
-  }
-  return true;
-}
-
-// ─── ARTIFACT PROCESSING WITH GUARDRAILS ────────────────────────────────────
-
-async function processArtifacts(agentId: string, workspaceId: string | null, artifacts: ParsedArtifacts | null): Promise<ArtifactCounts> {
-  const counts: ArtifactCounts = { tasks: 0, approvals: 0, memories: 0, insights: 0 };
-  if (!artifacts) return counts;
+  let tasksCreated = 0;
+  let approvalsCreated = 0;
+  let memoriesCreated = 0;
+  let insightsCreated = 0;
 
   const baseUrl = getSupabaseUrl();
-  const headers = {
-    ...getSupabaseHeaders(),
-    Prefer: "return=minimal",
-  };
+  const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
 
-  const insertBatch = async (table: string, rows: Record<string, unknown>[]) => {
-    if (rows.length === 0) return 0;
-    const res = await fetch(`${baseUrl}/rest/v1/${table}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(rows),
-    });
-    if (!res.ok) {
-      const err = await res.text();
-      console.error(`[artifacts] Failed to insert into ${table}: ${res.status} ${err}`);
-      return 0;
-    }
-    return rows.length;
-  };
+  // --- TASKS ---
+  if (parsed.suggested_tasks?.length) {
+    for (const task of parsed.suggested_tasks) {
+      // Depth guard — never create tasks deeper than 3
+      const depth = task.parent_task_id
+        ? await getTaskDepth(task.parent_task_id) + 1
+        : 0;
 
-  // --- TASKS: deduplication + depth 0 for chat-created tasks ---
-  const taskRows: Record<string, unknown>[] = [];
-  for (const t of artifacts.suggested_tasks || []) {
-    const similar = await findSimilarActiveTask(workspaceId, t.title || "");
-    if (similar) {
-      console.log(`[task-dedup] Skipping "${t.title}" — similar to existing "${similar.title}"`);
-      // Append note to existing task
-      await fetch(`${baseUrl}/rest/v1/task_events`, {
+      if (depth > 3) {
+        console.warn(`[task-depth] Task depth limit reached, skipping: ${task.title}`);
+        continue;
+      }
+
+      // Collision detection — check for similar active tasks
+      const similar = await findSimilarActiveTask(workspaceId, task.title || "");
+
+      if (similar) {
+        console.log(`[task-dedup] Skipping "${task.title}" — similar to "${similar.title}"`);
+        await fetch(`${baseUrl}/rest/v1/task_events`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task_id: similar.id,
+            event_type: "agent_note",
+            event_payload: { note: `Agent note from ${agentId}: similar task suggested — "${task.title}"` },
+          }),
+        });
+        continue;
+      }
+
+      const res = await fetch(`${baseUrl}/rest/v1/tasks`, {
         method: "POST",
         headers,
         body: JSON.stringify({
-          task_id: similar.id,
-          event_type: "agent_note",
-          event_payload: { note: `${agentId} suggested similar work: "${t.title}"` },
+          workspace_id: workspaceId,
+          agent_role: task.agent_role || agentId,
+          title: (task.title || "Untitled").slice(0, 120),
+          description: task.description || "",
+          status: "pending",
+          priority: task.priority || 2,
+          urgency_score: task.urgency_score || 3,
+          impact_score: task.impact_score || 3,
+          depth: depth,
+          created_by: "agent",
+          parent_task_id: task.parent_task_id || null,
+          input_payload: task.input_payload || {},
         }),
       });
-    } else {
-      taskRows.push({
-        workspace_id: workspaceId,
-        agent_role: agentId,
-        title: (t.title || "Untitled").slice(0, 120),
-        description: t.description || null,
-        task_type: t.task_type || "general",
-        urgency_score: t.urgency_score || 3,
-        impact_score: t.impact_score || 3,
-        status: "queued",
-        source: "agent_output",
-        depth: 0,
-        created_by: "agent",
-      });
+
+      if (res.ok) tasksCreated++;
+      else console.error("[task-insert]", res.status, await res.text());
     }
   }
 
-  // --- MEMORIES: quality gate ---
-  const memoryRows = (artifacts.suggested_memories || [])
-    .filter(m => shouldStoreMemory(m))
-    .map(m => ({
-      workspace_id: workspaceId,
-      agent_role: agentId,
-      memory_text: m,
-      memory_type: "preference",
-      source: "conversation",
-      confidence: "medium",
-    }));
+  // --- APPROVALS ---
+  if (parsed.suggested_approvals?.length) {
+    for (const approval of parsed.suggested_approvals) {
+      const res = await fetch(`${baseUrl}/rest/v1/approvals`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          agent_role: agentId,
+          approval_type: approval.approval_type || "general",
+          title: approval.title || "Untitled",
+          preview_text: (approval.preview_text || "").slice(0, 150),
+          full_payload: approval.full_payload || {},
+          status: "pending",
+        }),
+      });
 
-  // --- INSIGHTS: evidence filter ---
-  const insightRows = (artifacts.insights || [])
-    .map(parseInsight)
-    .filter(shouldStoreInsight)
-    .map(ins => ({
-      workspace_id: workspaceId,
-      agent_role: agentId,
-      insight_text: ins.insight_text,
-      evidence: ins.evidence,
-      signal_count: ins.signal_count,
-      category: "general",
-    }));
+      if (res.ok) approvalsCreated++;
+      else console.error("[approval-insert]", res.status, await res.text());
+    }
+  }
 
-  const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
-    insertBatch("tasks", taskRows),
-    insertBatch("approvals", (artifacts.suggested_approvals || []).map(a => ({
-      workspace_id: workspaceId,
-      agent_role: agentId,
-      approval_type: a.approval_type || "general",
-      title: a.title || "Untitled",
-      preview_text: a.preview_text || null,
-      full_payload: a.full_payload || { platform: a.platform },
-      status: "pending",
-    }))),
-    insertBatch("agent_memories", memoryRows),
-    insertBatch("agent_insights", insightRows),
-  ]);
+  // --- MEMORIES ---
+  if (parsed.suggested_memories?.length) {
+    for (const memory of parsed.suggested_memories) {
+      const memText = typeof memory === "string" ? memory : memory.memory_text || "";
 
-  counts.tasks = taskCount;
-  counts.approvals = approvalCount;
-  counts.memories = memoryCount;
-  counts.insights = insightCount;
+      // Quality gate — must contain signal phrase and be substantive
+      const hasSignal = MEMORY_SIGNAL_PHRASES.some(p =>
+        memText.toLowerCase().includes(p)
+      );
+      const isSubstantive = memText.length >= 20;
+      const isGeneric = memText.toLowerCase().includes("likes clear") ||
+        memText.toLowerCase().includes("prefers good") ||
+        memText.toLowerCase().includes("values quality");
 
-  console.log(`[artifacts] Created: ${counts.tasks} tasks, ${counts.approvals} approvals, ${counts.memories} memories, ${counts.insights} insights`);
-  return counts;
+      if (!hasSignal || !isSubstantive || isGeneric) {
+        console.log(`[memory-gate] Rejected: "${memText.slice(0, 80)}"`);
+        continue;
+      }
+
+      const res = await fetch(`${baseUrl}/rest/v1/agent_memories`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          agent_role: agentId,
+          memory_text: memText,
+          memory_type: typeof memory === "object" ? memory.memory_type : "preference",
+          confidence: typeof memory === "object" ? memory.confidence : "medium",
+          importance: 3,
+        }),
+      });
+
+      if (res.ok) memoriesCreated++;
+      else console.error("[memory-insert]", res.status, await res.text());
+    }
+  }
+
+  // --- INSIGHTS ---
+  if (parsed.insights?.length) {
+    for (const insight of parsed.insights) {
+      const insightObj = typeof insight === "string"
+        ? { insight_text: insight, evidence: "", signal_count: 1 }
+        : insight;
+
+      // Quality gate — must have evidence and signal_count >= 2
+      if (!insightObj.evidence || insightObj.signal_count < 2) {
+        console.log(`[insight-gate] Rejected: "${insightObj.insight_text?.slice(0, 80)}"`);
+        continue;
+      }
+
+      const res = await fetch(`${baseUrl}/rest/v1/agent_insights`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workspace_id: workspaceId,
+          agent_role: agentId,
+          insight_text: insightObj.insight_text,
+          evidence: insightObj.evidence,
+          signal_count: insightObj.signal_count || 1,
+          category: "general",
+        }),
+      });
+
+      if (res.ok) insightsCreated++;
+      else console.error("[insight-insert]", res.status, await res.text());
+    }
+  }
+
+  console.log(`[artifacts] Created: ${tasksCreated} tasks, ${approvalsCreated} approvals, ${memoriesCreated} memories, ${insightsCreated} insights`);
+  return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated };
 }
 
-async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: ArtifactCounts, parseSuccess: boolean) {
+async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }, parseSuccess: boolean) {
   try {
     const baseUrl = getSupabaseUrl();
     const headers = { ...getSupabaseHeaders(), Prefer: "return=minimal" };
@@ -818,10 +843,10 @@ async function logAgentOutput(agentId: string, workspaceId: string | null, messa
         workspace_id: workspaceId,
         agent_role: agentId,
         raw_message: message.slice(0, 5000),
-        tasks_created: counts.tasks,
-        approvals_created: counts.approvals,
-        memories_created: counts.memories,
-        insights_created: counts.insights,
+        tasks_created: counts.tasksCreated,
+        approvals_created: counts.approvalsCreated,
+        memories_created: counts.memoriesCreated,
+        insights_created: counts.insightsCreated,
         parse_success: parseSuccess,
       }),
     });
