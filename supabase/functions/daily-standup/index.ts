@@ -168,7 +168,7 @@ serve(async (req) => {
       },
     };
 
-    const agentIds = ["bloomsuite", "clinicleader", "projectpath", "discprofile", "inbox"];
+    const agentIds = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
 
     const results = await Promise.all(
       agentIds.map(id =>
