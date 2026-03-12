@@ -630,28 +630,15 @@ Rules:
 - Be specific and actionable
 - Return raw JSON only`;
 
-  const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${LOVABLE_API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-flash",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: "Generate today's prioritized tasks for Jon's standup." },
-      ],
-    }),
+  const aiResult = await runReasoningModel({
+    systemPrompt,
+    userMessage: "Generate today's prioritized tasks for Jon's standup.",
+    agentRole: "executive",
+    workspaceId: null,
+    callPurpose: "scheduled_standup",
   });
 
-  if (!aiResponse.ok) {
-    const errText = await aiResponse.text();
-    throw new Error(`AI error: ${aiResponse.status} ${errText}`);
-  }
-
-  const aiData = await aiResponse.json();
-  const rawText = aiData.choices?.[0]?.message?.content || "";
+  const rawText = aiResult.text;
 
   let parsed: any = { tasks: [] };
   try {
