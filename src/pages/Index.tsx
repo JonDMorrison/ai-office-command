@@ -49,7 +49,14 @@ const Index = () => {
   const handleOpenApprovals = useCallback(() => {
     setShowApprovals(prev => !prev);
     if (selectedAgentId) setSelectedAgentId(null);
-  }, [selectedAgentId]);
+    if (showActivity) setShowActivity(false);
+  }, [selectedAgentId, showActivity]);
+
+  const handleOpenActivity = useCallback(() => {
+    setShowActivity(prev => !prev);
+    if (selectedAgentId) setSelectedAgentId(null);
+    if (showApprovals) setShowApprovals(false);
+  }, [selectedAgentId, showApprovals]);
 
   /*
    * Layout: The control room has three visual rows
