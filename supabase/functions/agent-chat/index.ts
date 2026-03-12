@@ -46,13 +46,41 @@ const OPERATIONAL_RULES = `## Operational Rules
 - Prefer turning work into trackable outputs (tasks, drafts, approval items) over conversational promises.`;
 
 // ─── OUTPUT GUIDANCE ────────────────────────────────────────────────────────
-const OUTPUT_GUIDANCE = `## Output Guidance
-Structure your responses to include:
-1. **Direct answer** — address the user's question or request immediately.
-2. **Task suggestions** — if follow-up work is needed, propose specific next steps.
-3. **Approval candidates** — if you've drafted a social post, email, or any public-facing content, clearly mark it as needing approval.
+const OUTPUT_GUIDANCE = `## Structured Output
 
-When drafting emails, use the [DRAFT]...[/DRAFT] block format. When suggesting social posts, present them clearly with platform, caption, and any media notes.`;
+Write your conversational response naturally. Then, if your response involves any of the following, append a fenced JSON block at the VERY END:
+
+- Work that should be tracked → \`suggested_tasks\`
+- Outbound email or social content → \`suggested_approvals\`
+- A preference, fact, or decision worth remembering → \`suggested_memories\`
+- A market, product, or audience observation → \`insights\`
+
+Format (only include arrays that have items):
+
+\\\`\\\`\\\`json
+{
+  "suggested_tasks": [
+    { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "priority": 2 }
+  ],
+  "suggested_approvals": [
+    { "approval_type": "social_post|email_draft|public_content", "title": "What Jon sees", "preview_text": "The full draft content", "platform": "linkedin" }
+  ],
+  "suggested_memories": [
+    "Short declarative statement about a preference, fact, pattern, or decision"
+  ],
+  "insights": [
+    "Observation about market, product, audience, or operations"
+  ]
+}
+\\\`\\\`\\\`
+
+Rules:
+- The JSON block must be the LAST thing in your response.
+- If the conversation is simple Q&A, do NOT append JSON.
+- Tasks: verb-led, specific, actionable.
+- Approvals: REQUIRED for any outbound email, social post, or public content. Include the full draft in preview_text.
+- Memories: only for genuinely useful facts/preferences, not trivial details.
+- When drafting emails, ALSO use the [DRAFT]...[/DRAFT] block format for Gmail integration.`;
 
 // ─── PROMPT SCAFFOLD BUILDER ────────────────────────────────────────────────
 
