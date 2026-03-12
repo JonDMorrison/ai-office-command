@@ -18,29 +18,29 @@ export type Database = {
         Row: {
           agent_role: string
           category: string
-          company_id: string
           created_at: string
           id: string
           insight_text: string
           source_task_id: string | null
+          workspace_id: string
         }
         Insert: {
           agent_role: string
           category?: string
-          company_id: string
           created_at?: string
           id?: string
           insight_text: string
           source_task_id?: string | null
+          workspace_id: string
         }
         Update: {
           agent_role?: string
           category?: string
-          company_id?: string
           created_at?: string
           id?: string
           insight_text?: string
           source_task_id?: string | null
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -55,36 +55,45 @@ export type Database = {
       agent_memories: {
         Row: {
           agent_role: string
-          company_id: string
           created_at: string
           expires_at: string | null
           id: string
+          importance: number | null
+          last_referenced_at: string | null
           memory_text: string
           memory_type: string
+          reference_count: number | null
           relevance_score: number
           source: string
+          workspace_id: string
         }
         Insert: {
           agent_role: string
-          company_id: string
           created_at?: string
           expires_at?: string | null
           id?: string
+          importance?: number | null
+          last_referenced_at?: string | null
           memory_text: string
           memory_type?: string
+          reference_count?: number | null
           relevance_score?: number
           source?: string
+          workspace_id: string
         }
         Update: {
           agent_role?: string
-          company_id?: string
           created_at?: string
           expires_at?: string | null
           id?: string
+          importance?: number | null
+          last_referenced_at?: string | null
           memory_text?: string
           memory_type?: string
+          reference_count?: number | null
           relevance_score?: number
           source?: string
+          workspace_id?: string
         }
         Relationships: []
       }
@@ -92,7 +101,6 @@ export type Database = {
         Row: {
           agent_role: string
           approvals_created: number
-          company_id: string
           conversation_id: string | null
           created_at: string
           id: string
@@ -101,11 +109,11 @@ export type Database = {
           parse_success: boolean
           raw_message: string
           tasks_created: number
+          workspace_id: string
         }
         Insert: {
           agent_role: string
           approvals_created?: number
-          company_id: string
           conversation_id?: string | null
           created_at?: string
           id?: string
@@ -114,11 +122,11 @@ export type Database = {
           parse_success?: boolean
           raw_message: string
           tasks_created?: number
+          workspace_id: string
         }
         Update: {
           agent_role?: string
           approvals_created?: number
-          company_id?: string
           conversation_id?: string | null
           created_at?: string
           id?: string
@@ -127,8 +135,47 @@ export type Database = {
           parse_success?: boolean
           raw_message?: string
           tasks_created?: number
+          workspace_id?: string
         }
         Relationships: []
+      }
+      agent_sessions: {
+        Row: {
+          agent_role: string
+          id: string
+          last_message_at: string | null
+          message_count: number | null
+          started_at: string | null
+          summary: string | null
+          workspace_id: string | null
+        }
+        Insert: {
+          agent_role: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number | null
+          started_at?: string | null
+          summary?: string | null
+          workspace_id?: string | null
+        }
+        Update: {
+          agent_role?: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number | null
+          started_at?: string | null
+          summary?: string | null
+          workspace_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_sessions_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       agent_skills: {
         Row: {
@@ -159,7 +206,6 @@ export type Database = {
           agent_role: string
           approval_type: string
           approved_at: string | null
-          company_id: string
           created_at: string
           full_payload: Json
           id: string
@@ -169,12 +215,12 @@ export type Database = {
           task_id: string | null
           title: string
           updated_at: string
+          workspace_id: string
         }
         Insert: {
           agent_role: string
           approval_type: string
           approved_at?: string | null
-          company_id: string
           created_at?: string
           full_payload?: Json
           id?: string
@@ -184,12 +230,12 @@ export type Database = {
           task_id?: string | null
           title: string
           updated_at?: string
+          workspace_id: string
         }
         Update: {
           agent_role?: string
           approval_type?: string
           approved_at?: string | null
-          company_id?: string
           created_at?: string
           full_payload?: Json
           id?: string
@@ -199,6 +245,7 @@ export type Database = {
           task_id?: string | null
           title?: string
           updated_at?: string
+          workspace_id?: string
         }
         Relationships: [
           {
@@ -245,7 +292,6 @@ export type Database = {
       tasks: {
         Row: {
           agent_role: string
-          company_id: string
           completed_at: string | null
           created_at: string
           description: string | null
@@ -259,10 +305,10 @@ export type Database = {
           task_type: string
           title: string
           updated_at: string
+          workspace_id: string | null
         }
         Insert: {
           agent_role: string
-          company_id: string
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -276,10 +322,10 @@ export type Database = {
           task_type?: string
           title: string
           updated_at?: string
+          workspace_id?: string | null
         }
         Update: {
           agent_role?: string
-          company_id?: string
           completed_at?: string | null
           created_at?: string
           description?: string | null
@@ -293,6 +339,46 @@ export type Database = {
           task_type?: string
           title?: string
           updated_at?: string
+          workspace_id?: string | null
+        }
+        Relationships: []
+      }
+      workspaces: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          github_repo: string | null
+          gmail_secret_key: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notion_page_id: string | null
+          supabase_project_id: string | null
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          github_repo?: string | null
+          gmail_secret_key?: string | null
+          id: string
+          is_active?: boolean | null
+          name: string
+          notion_page_id?: string | null
+          supabase_project_id?: string | null
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          github_repo?: string | null
+          gmail_secret_key?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notion_page_id?: string | null
+          supabase_project_id?: string | null
         }
         Relationships: []
       }

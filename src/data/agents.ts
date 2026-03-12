@@ -5,6 +5,7 @@ export interface Agent {
   name: string;
   role: string;
   product: string;
+  workspaceId: string | null;
   colorVar: string;
   colorHex: string;
   avatar: string;
@@ -23,6 +24,7 @@ export const agents: Agent[] = [
     name: 'BloomSuite',
     role: 'Garden Center Marketing & SaaS',
     product: 'BloomSuite',
+    workspaceId: 'bloomsuite',
     colorVar: 'agent-bloom',
     colorHex: '#22c55e',
     avatar: '🌿',
@@ -82,6 +84,7 @@ You are friendly, knowledgeable about horticulture and garden centre retail, and
     name: 'ClinicLeader',
     role: 'Founding Agent — Clinic Ops',
     product: 'ClinicLeader',
+    workspaceId: 'clinicleader',
     colorVar: 'agent-clinic',
     colorHex: '#3b82f6',
     avatar: '🏥',
@@ -176,6 +179,7 @@ You speak with authority about clinic operations, leadership structure, and the 
     name: 'ProjectPath',
     role: 'Construction OS Expert',
     product: 'ProjectPath',
+    workspaceId: 'projectpath',
     colorVar: 'agent-project',
     colorHex: '#f59e0b',
     avatar: '🏗️',
@@ -340,10 +344,11 @@ You speak in practical, field-ready construction terms. You understand both the 
     ],
   },
   {
-    id: 'discprofile',
+    id: 'disc',
     name: 'DISC Profile',
     role: 'Personality Assessments & Team Dynamics',
     product: 'DISC Profile',
+    workspaceId: 'disc',
     colorVar: 'agent-disc',
     colorHex: '#a855f7',
     avatar: '🧠',
@@ -498,6 +503,7 @@ You are insightful, empathetic, and psychology-informed. You make DISC accessibl
     name: 'Inbox',
     role: 'Email & Comms',
     product: 'Inbox',
+    workspaceId: null,
     colorVar: 'agent-inbox',
     colorHex: '#f97316',
     avatar: '📬',
@@ -555,6 +561,29 @@ Gmail access is handled via MCP integration through Claude Code. You have read/d
       'Queuing 2 outbound drafts for approval...',
       'Summarizing Brands in Blooms vendor thread...',
       'Tracking 5 overdue follow-ups across accounts...',
+    ],
+  },
+  {
+    id: 'executive',
+    name: 'Chief of Staff',
+    role: 'Executive Synthesis & Prioritization',
+    product: 'Executive',
+    workspaceId: null,
+    colorVar: 'agent-exec',
+    colorHex: '#ef4444',
+    avatar: '👔',
+    hairColor: '#2c2c2c',
+    hairStyle: 'short',
+    skinTone: '#e0b090',
+    status: 'active',
+    currentTask: 'Reviewing cross-workspace priorities...',
+    systemPrompt: `You are Jon Morrison's Chief of Staff — the executive synthesis agent. You see across all four products (BloomSuite, ClinicLeader, ProjectPath, DISC Profile) and help Jon decide where to focus. You don't do product-specific work — you prioritize, flag blockers, and push back when Jon is spreading too thin.`,
+    tasks: [
+      'Reviewing cross-workspace priorities...',
+      'Analyzing task completion rates across products...',
+      'Flagging blocked items that need Jon\'s attention...',
+      'Preparing daily focus recommendation...',
+      'Surfacing pending approvals across all workspaces...',
     ],
   },
 ];

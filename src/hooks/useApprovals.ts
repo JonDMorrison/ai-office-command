@@ -1,10 +1,10 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { COMPANY_ID } from '@/lib/constants';
+import { getWorkspaceForAgent } from '@/lib/constants';
 
 export interface Approval {
   id: string;
-  company_id: string;
+  workspace_id: string | null;
   agent_role: string;
   task_id: string | null;
   approval_type: string;
@@ -18,21 +18,19 @@ export interface Approval {
   rejected_at: string | null;
 }
 
-
-
 export function useApprovals() {
   const [approvals, setApprovals] = useState<Approval[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const fetchApprovals = useCallback(async (filters?: { status?: string; agent_role?: string }) => {
+  const fetchApprovals = useCallback(async (filters?: { status?: string; agent_role?: string; workspace_id?: string }) => {
     setLoading(true);
     try {
       let query = (supabase
         .from('approvals' as any)
         .select('*') as any)
-        .eq('company_id', COMPANY_ID)
         .order('created_at', { ascending: false });
 
+      if (filters?.workspace_id) query = query.eq('workspace_id', filters.workspace_id);
       if (filters?.status) query = query.eq('status', filters.status);
       if (filters?.agent_role) query = query.eq('agent_role', filters.agent_role);
 
@@ -57,10 +55,11 @@ export function useApprovals() {
     task_id?: string;
   }) => {
     try {
+      const workspaceId = getWorkspaceForAgent(item.agent_role);
       const { data, error } = await (supabase
         .from('approvals' as any)
         .insert({
-          company_id: COMPANY_ID,
+          workspace_id: workspaceId,
           agent_role: item.agent_role,
           task_id: item.task_id || null,
           approval_type: item.approval_type,

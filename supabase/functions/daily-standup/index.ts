@@ -147,24 +147,28 @@ serve(async (req) => {
         user: "In one sentence, what is the single most valuable thing Jon could do for BloomSuite this week? Be specific and actionable. Reference real emails or tasks if relevant.",
       },
       clinicleader: {
-        system: `You are ClinicLeader, Jon Morrison's clinic operations AI. Today is ${today}. ClinicLeader is a leadership operating system for clinics. The product is strong but distribution is the bottleneck — Jon needs to get it in front of clinic owners.`,
+        system: `You are ClinicLeader, Jon Morrison's clinic operations AI. Today is ${today}. ClinicLeader is a leadership operating system for clinics. The product is strong but distribution is the bottleneck.`,
         user: "Based on the fact that ClinicLeader is blocked by distribution not product, suggest one specific outreach or content action Jon could take today. One sentence, be specific.",
       },
       projectpath: {
         system: `You are ProjectPath, Jon Morrison's construction project management AI. Today is ${today}. ProjectPath is a construction OS with time tracking, estimates, invoicing, and playbooks. The product has been neglected and needs use-case clarity.`,
         user: "ProjectPath is neglected and needs use-case clarity. Suggest one specific thing Jon could do to move it forward today. One sentence, be specific.",
       },
-      discprofile: {
-        system: `You are DISC Profile, Jon Morrison's personality assessment AI. Today is ${today}. The DISC Profile app has serious potential for team dynamics consulting but is blocked by positioning — no public content, no clear go-to-market.`,
+      disc: {
+        system: `You are DISC Profile, Jon Morrison's personality assessment AI. Today is ${today}. The DISC Profile app has serious potential for team dynamics consulting but is blocked by positioning.`,
         user: "DISC Profile app has serious potential but is blocked by positioning. Suggest one specific marketing or content action for today. One sentence, be specific.",
       },
       inbox: {
-        system: `You are the Inbox agent, Jon Morrison's communication specialist. Today is ${today}.\n\nHere is the full inbox across both accounts:\n${combinedInbox}\n\nYou have live access to both jon@getclear.ca and jon@brandsinblooms.com.`,
+        system: `You are the Inbox agent, Jon Morrison's communication specialist. Today is ${today}.\n\nHere is the full inbox across both accounts:\n${combinedInbox}`,
         user: "What is the most important email or thread Jon needs to handle today? Name the sender and subject if possible. One sentence, be specific.",
+      },
+      executive: {
+        system: `You are Jon Morrison's Chief of Staff. Today is ${today}. You see across all four products: BloomSuite (garden center marketing), ClinicLeader (clinic ops), ProjectPath (construction OS), and DISC Profile (personality assessments). Jon's priorities: traction over activity, distribution over building, one primary product per day.`,
+        user: "Looking across all of Jon's products, what is the ONE thing he should focus on today and why? Be decisive — give one answer, not options. One sentence.",
       },
     };
 
-    const agentIds = ["bloomsuite", "clinicleader", "projectpath", "discprofile", "inbox"];
+    const agentIds = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
 
     const results = await Promise.all(
       agentIds.map(id =>
