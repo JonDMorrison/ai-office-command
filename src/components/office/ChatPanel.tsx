@@ -19,7 +19,7 @@ interface Message {
   artifacts?: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
 }
 
-const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps) => {
+const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote }: ChatPanelProps) => {
   const [messages, setMessages] = useState<Message[]>(() => {
     const initial: Message[] = [];
     if (initialNote) {
