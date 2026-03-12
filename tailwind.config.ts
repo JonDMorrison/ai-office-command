@@ -67,6 +67,7 @@ export default {
           project: "hsl(var(--agent-project))",
           disc: "hsl(var(--agent-disc))",
           inbox: "hsl(var(--agent-inbox))",
+          exec: "hsl(var(--agent-exec))",
         },
       },
       borderRadius: {
