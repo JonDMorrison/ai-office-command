@@ -61,29 +61,35 @@ interface ScaffoldInput {
   skillContent: string;
   inboxContext?: string;
   activeTasks?: string;
+  pendingApprovals?: string;
 }
 
 function buildPromptScaffold(input: ScaffoldInput): string {
   const sections: string[] = [];
   const agentLabel = agentId_toLabel(input.agentId);
+  const sectionNames: string[] = [];
 
   // A. Agent Identity
-  sections.push(`## Agent Identity\nYou are the **${agentLabel}** agent for **Jon Morrison**.`);
+  sections.push(`## Agent Identity\nYou are the **${agentLabel}** agent working for **Jon Morrison**.`);
+  sectionNames.push("A:Identity");
 
-  // B. Company Context
+  // B. Workspace Context
   const companyCtx = COMPANY_CONTEXT[input.agentId];
   if (companyCtx) {
-    sections.push(`## Company Context\n${companyCtx}`);
+    sections.push(`## Workspace Context\n${companyCtx}`);
+    sectionNames.push("B:Workspace");
   }
 
-  // C. Role Responsibility
+  // C. Responsibility Scope
   const roleResp = ROLE_RESPONSIBILITY[input.agentId];
   if (roleResp) {
-    sections.push(`## Role Responsibility\n${roleResp}`);
+    sections.push(`## Responsibility Scope\n${roleResp}`);
+    sectionNames.push("C:Responsibility");
   }
 
   // D. Operational Rules
   sections.push(OPERATIONAL_RULES);
+  sectionNames.push("D:Rules");
 
   // E. Current Date and Time
   const now = new Date();
@@ -95,35 +101,51 @@ function buildPromptScaffold(input: ScaffoldInput): string {
     hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", hour12: true,
   });
   sections.push(`## Current Date & Time\n${dateStr} at ${timeStr} (Eastern)`);
+  sectionNames.push("E:DateTime");
 
   // F. Active Tasks
   if (input.activeTasks && input.activeTasks.length > 0) {
     sections.push(`## Active Tasks\nThe following tasks are currently open for your role:\n\n${input.activeTasks}`);
+    sectionNames.push("F:Tasks(populated)");
   } else {
     sections.push(`## Active Tasks\nNo active tasks currently assigned.`);
+    sectionNames.push("F:Tasks(empty)");
   }
 
-  // G. Memory Placeholder
-  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
+  // G. Pending Approvals
+  if (input.pendingApprovals && input.pendingApprovals.length > 0) {
+    sections.push(`## Pending Approvals\nThe following items are awaiting Jon's approval for your workspace:\n\n${input.pendingApprovals}`);
+    sectionNames.push("G:Approvals(populated)");
+  } else {
+    sections.push(`## Pending Approvals\nNo items currently awaiting approval.`);
+    sectionNames.push("G:Approvals(empty)");
+  }
 
-  // H. Inbox / Live Context (agent-specific, injected before skills)
+  // H. Memory Placeholder
+  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
+  sectionNames.push("H:Memory");
+
+  // Inbox / Live Context (agent-specific, injected before skills)
   if (input.inboxContext) {
     sections.push(input.inboxContext);
+    sectionNames.push("LiveContext:Inbox");
   }
 
   // I. Skill Modules
   if (input.skillContent) {
     sections.push(`## Skill Modules\n${input.skillContent}`);
+    sectionNames.push("I:Skills");
   }
 
   // J. Output Guidance
   sections.push(OUTPUT_GUIDANCE);
+  sectionNames.push("J:Output");
 
   const assembled = sections.join("\n\n---\n\n");
 
   // Debug logging
   console.log(`[prompt-scaffold] Agent: ${input.agentId}`);
-  console.log(`[prompt-scaffold] Sections: ${sections.length}`);
+  console.log(`[prompt-scaffold] Sections (${sectionNames.length}): ${sectionNames.join(" → ")}`);
   console.log(`[prompt-scaffold] Total length: ${assembled.length} chars`);
 
   return assembled;
