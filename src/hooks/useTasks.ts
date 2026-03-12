@@ -28,9 +28,9 @@ export function useTasks() {
   const fetchTasks = useCallback(async (filters?: { status?: string; agent_role?: string }) => {
     setLoading(true);
     try {
-      let query = supabase
-        .from('tasks')
-        .select('*')
+      let query = (supabase
+        .from('tasks' as any)
+        .select('*') as any)
         .eq('company_id', COMPANY_ID)
         .order('created_at', { ascending: false });
 
