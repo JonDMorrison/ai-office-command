@@ -6,6 +6,8 @@ export interface Task {
   id: string;
   workspace_id: string | null;
   agent_role: string;
+  assigned_agent: string | null;
+  created_by_agent: string | null;
   title: string;
   description: string | null;
   task_type: string;
