@@ -320,13 +320,13 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
   taskId: string;
   status: string;
   message: string;
-  artifactCounts: { tasks: number; approvals: number; memories: number; insights: number };
+  artifactCounts: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
 }> {
   const result = {
     taskId: task.id,
     status: "completed" as string,
     message: "",
-    artifactCounts: { tasks: 0, approvals: 0, memories: 0, insights: 0 },
+    artifactCounts: { tasks: 0, approvals: 0, memories: 0, insights: 0, delegations: 0 },
   };
 
   try {
