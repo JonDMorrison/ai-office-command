@@ -119,13 +119,17 @@ const Index = () => {
 
         </div>
 
-        {selectedAgent && (
+        {selectedAgent && !showApprovals && (
           <ChatPanel
             agent={selectedAgent}
             onClose={() => setSelectedAgentId(null)}
             onOpenSkills={() => setShowSkills(true)}
             initialNote={followUpNotes.current[selectedAgent.id]}
           />
+        )}
+
+        {showApprovals && (
+          <ApprovalQueue onClose={() => setShowApprovals(false)} />
         )}
       </div>
 
