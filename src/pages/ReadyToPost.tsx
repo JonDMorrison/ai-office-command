@@ -13,6 +13,7 @@ interface ApprovedPost {
   full_payload: Record<string, unknown>;
   approved_at: string | null;
   workspace_id: string;
+  image_url: string | null;
 }
 
 const ReadyToPost = () => {
