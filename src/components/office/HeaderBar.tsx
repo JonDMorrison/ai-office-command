@@ -104,6 +104,19 @@ const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals
           </button>
         )}
 
+        {/* Ready to Post */}
+        <Link
+          to="/ready-to-post"
+          className="relative px-3 py-1.5 rounded-lg text-[11px] font-semibold text-foreground border border-border hover:bg-secondary transition-all"
+        >
+          📋 Ready to Post
+          {readyToPostCount > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center">
+              {readyToPostCount}
+            </span>
+          )}
+        </Link>
+
         {/* Approvals */}
         {onOpenApprovals && (
           <button
