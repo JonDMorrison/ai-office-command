@@ -90,6 +90,8 @@ interface ScaffoldInput {
   inboxContext?: string;
   activeTasks?: string;
   pendingApprovals?: string;
+  memories?: string;
+  insights?: string;
 }
 
 function buildPromptScaffold(input: ScaffoldInput): string {
@@ -149,9 +151,20 @@ function buildPromptScaffold(input: ScaffoldInput): string {
     sectionNames.push("G:Approvals(empty)");
   }
 
-  // H. Memory Placeholder
-  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
-  sectionNames.push("H:Memory");
+  // H. Relevant Memory
+  if (input.memories && input.memories.length > 0) {
+    sections.push(`## Relevant Memory\nThese are things you've learned from past conversations. Use them to personalize your responses and avoid asking Jon things he's already told you.\n\n${input.memories}`);
+    sectionNames.push("H:Memory(populated)");
+  } else {
+    sections.push(`## Relevant Memory\nNo memories stored yet. As you learn Jon's preferences and decisions, they will appear here.`);
+    sectionNames.push("H:Memory(empty)");
+  }
+
+  // H2. Relevant Insights
+  if (input.insights && input.insights.length > 0) {
+    sections.push(`## Relevant Insights\nObservations from past work that may inform your current response:\n\n${input.insights}`);
+    sectionNames.push("H2:Insights(populated)");
+  }
 
   // Inbox / Live Context (agent-specific, injected before skills)
   if (input.inboxContext) {
@@ -286,6 +299,74 @@ async function loadPendingApprovals(agentId: string): Promise<string> {
     }).join("\n");
   } catch (e) {
     console.error("[approvals] Error loading pending approvals:", e);
+    return "";
+  }
+}
+
+// ─── MEMORY LOADER ──────────────────────────────────────────────────────────
+
+async function loadMemories(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&company_id=eq.joncoach&order=relevance_score.desc,created_at.desc&limit=15`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[memory] Failed to fetch memories: ${res.status}`);
+      return "";
+    }
+    const memories = await res.json();
+    if (!memories || memories.length === 0) return "";
+
+    console.log(`[memory] Found ${memories.length} memories for ${agentId}`);
+    return memories.map((m: any, i: number) => {
+      const type = m.memory_type || "general";
+      return `- [${type}] ${m.memory_text}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[memory] Error loading memories:", e);
+    return "";
+  }
+}
+
+// ─── INSIGHTS LOADER ────────────────────────────────────────────────────────
+
+async function loadRecentInsights(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/agent_insights?agent_role=eq.${agentId}&company_id=eq.joncoach&order=created_at.desc&limit=10`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[insights] Failed to fetch insights: ${res.status}`);
+      return "";
+    }
+    const insights = await res.json();
+    if (!insights || insights.length === 0) return "";
+
+    console.log(`[insights] Found ${insights.length} insights for ${agentId}`);
+    return insights.map((ins: any) => {
+      const cat = ins.category || "general";
+      return `- [${cat}] ${ins.insight_text}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[insights] Error loading insights:", e);
     return "";
   }
 }
@@ -577,11 +658,13 @@ serve(async (req) => {
       );
     }
 
-    // Load skills, tasks, approvals, and inbox context in parallel
-    const [skillContent, activeTasks, pendingApprovals, inboxContext] = await Promise.all([
+    // Load skills, tasks, approvals, memories, insights, and inbox context in parallel
+    const [skillContent, activeTasks, pendingApprovals, memories, recentInsights, inboxContext] = await Promise.all([
       loadSkillModules(agentId, GITHUB_TOKEN),
       loadActiveTasks(agentId),
       loadPendingApprovals(agentId),
+      loadMemories(agentId),
+      loadRecentInsights(agentId),
       (agentId === "bloomsuite")
         ? buildBloomsuiteInboxContext().catch(e => {
             console.error("[inbox-ctx] BloomSuite error:", e);
@@ -602,6 +685,8 @@ serve(async (req) => {
       inboxContext: inboxContext || undefined,
       activeTasks,
       pendingApprovals,
+      memories,
+      insights: recentInsights,
     });
 
     console.log(`[agent-chat] System prompt assembled: ${systemPrompt.length} chars`);
