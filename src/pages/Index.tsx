@@ -11,7 +11,7 @@ import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
 import ApprovalQueue from '@/components/office/ApprovalQueue';
-import ActivityFeed from '@/components/office/ActivityFeed';
+import ActivityFeed, { ActivityFeedPanel } from '@/components/office/ActivityFeed';
 import OperationsRail from '@/components/office/OperationsRail';
 
 const Index = () => {
@@ -19,6 +19,7 @@ const Index = () => {
   const [showSkills, setShowSkills] = useState(false);
   const [standupActive, setStandupActive] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
+  const [showActivity, setShowActivity] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides, refetch: refetchAgentStates } = useAgentStates();
   const { tasks, fetchTasks, createTask } = useTasks();
@@ -33,6 +34,7 @@ const Index = () => {
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
     if (showApprovals) setShowApprovals(false);
+    if (showActivity) setShowActivity(false);
   };
 
   const handleStandupApproved = useCallback((approvedIds: string[], followUps: Record<string, string>) => {
@@ -47,7 +49,14 @@ const Index = () => {
   const handleOpenApprovals = useCallback(() => {
     setShowApprovals(prev => !prev);
     if (selectedAgentId) setSelectedAgentId(null);
-  }, [selectedAgentId]);
+    if (showActivity) setShowActivity(false);
+  }, [selectedAgentId, showActivity]);
+
+  const handleOpenActivity = useCallback(() => {
+    setShowActivity(prev => !prev);
+    if (selectedAgentId) setSelectedAgentId(null);
+    if (showApprovals) setShowApprovals(false);
+  }, [selectedAgentId, showApprovals]);
 
   /*
    * Layout: The control room has three visual rows
@@ -121,8 +130,8 @@ const Index = () => {
           {/* Operations Rail — bottom left, inside the room */}
           <OperationsRail />
 
-          {/* Activity Feed — bottom right, inside the room */}
-          <ActivityFeed />
+          {/* Activity Feed trigger — bottom right, inside the room */}
+          {!showActivity && <ActivityFeed onOpen={handleOpenActivity} />}
 
           {/* Daily Standup overlay */}
           {standupActive && (
@@ -147,6 +156,10 @@ const Index = () => {
 
         {showApprovals && (
           <ApprovalQueue onClose={() => setShowApprovals(false)} />
+        )}
+
+        {showActivity && (
+          <ActivityFeedPanel onClose={() => setShowActivity(false)} />
         )}
       </div>
 

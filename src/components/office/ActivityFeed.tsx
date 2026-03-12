@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { agents } from '@/data/agents';
 import {
   Activity, CheckCircle2, Clock, AlertTriangle, Send,
-  ArrowRightLeft, Brain, Lightbulb, Shield, ChevronDown, ChevronUp,
-  ExternalLink, FileText, ListTodo, Eye,
+  ArrowRightLeft, Brain, Lightbulb, Shield, X,
+  FileText, ListTodo,
 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -17,11 +18,9 @@ interface FeedEvent {
   target?: string;
   summary: string;
   workspace?: string;
-  // Source references for detail loading
   sourceType: 'task_event' | 'approval' | 'output';
-  sourceId: string; // original record id
+  sourceId: string;
   taskId?: string;
-  // Inline data when available
   taskTitle?: string;
   taskDescription?: string;
   outputMessage?: string;
@@ -102,8 +101,6 @@ function formatTaskEvent(event: any, task: any): FeedEvent | null {
       summary = `${actorName}: ${event.event_type} on ${title}`;
   }
 
-  const artifactCounts = payload.artifact_counts || undefined;
-
   return {
     id: event.id,
     timestamp: event.created_at,
@@ -117,7 +114,7 @@ function formatTaskEvent(event: any, task: any): FeedEvent | null {
     taskId: event.task_id,
     taskTitle: task?.title,
     taskDescription: task?.description,
-    artifactCounts,
+    artifactCounts: payload.artifact_counts || undefined,
   };
 }
 
@@ -188,77 +185,64 @@ const EventDetail = ({ event }: { event: FeedEvent }) => {
     (event.artifactCounts.tasks || 0) + (event.artifactCounts.approvals || 0) +
     (event.artifactCounts.memories || 0) + (event.artifactCounts.insights || 0) > 0
   );
-
-  // Determine the best description text
   const descriptionText = event.outputMessage || event.taskDescription || event.approvalPreview || null;
 
   return (
-    <div className="mt-1.5 ml-4 mr-1 mb-1 p-2.5 rounded-lg bg-secondary/40 border border-border/40 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
-      {/* Task title if available */}
+    <div className="mt-1 ml-6 mr-2 mb-2 p-3 rounded-lg bg-secondary/40 border border-border/40 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
       {event.taskTitle && (
-        <div className="flex items-start gap-1.5">
-          <FileText size={10} className="text-muted-foreground mt-0.5 shrink-0" />
-          <span className="text-[10px] font-medium text-foreground leading-snug">{event.taskTitle}</span>
+        <div className="flex items-start gap-2">
+          <FileText size={12} className="text-muted-foreground mt-0.5 shrink-0" />
+          <span className="text-xs font-medium text-foreground leading-snug">{event.taskTitle}</span>
         </div>
       )}
-
-      {/* Description / output message */}
       {descriptionText && (
-        <p className="text-[10px] leading-relaxed text-muted-foreground line-clamp-4">
+        <p className="text-[11px] leading-relaxed text-muted-foreground line-clamp-6">
           {descriptionText}
         </p>
       )}
-
-      {/* Artifact counts */}
       {hasArtifacts && (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-2">
           {(event.artifactCounts?.tasks || 0) > 0 && (
-            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md bg-primary/10 text-primary font-medium">
-              <ListTodo size={8} /> {event.artifactCounts!.tasks} task{event.artifactCounts!.tasks! > 1 ? 's' : ''}
+            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-primary/10 text-primary font-medium">
+              <ListTodo size={10} /> {event.artifactCounts!.tasks} task{event.artifactCounts!.tasks! > 1 ? 's' : ''}
             </span>
           )}
           {(event.artifactCounts?.approvals || 0) > 0 && (
-            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-500 font-medium">
-              <Send size={8} /> {event.artifactCounts!.approvals} draft{event.artifactCounts!.approvals! > 1 ? 's' : ''}
+            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-500 font-medium">
+              <Send size={10} /> {event.artifactCounts!.approvals} draft{event.artifactCounts!.approvals! > 1 ? 's' : ''}
             </span>
           )}
           {(event.artifactCounts?.insights || 0) > 0 && (
-            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500/10 text-amber-500 font-medium">
-              <Lightbulb size={8} /> {event.artifactCounts!.insights} insight{event.artifactCounts!.insights! > 1 ? 's' : ''}
+            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-500 font-medium">
+              <Lightbulb size={10} /> {event.artifactCounts!.insights} insight{event.artifactCounts!.insights! > 1 ? 's' : ''}
             </span>
           )}
           {(event.artifactCounts?.memories || 0) > 0 && (
-            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-500 font-medium">
-              <Brain size={8} /> {event.artifactCounts!.memories} memory
+            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/10 text-purple-500 font-medium">
+              <Brain size={10} /> {event.artifactCounts!.memories} memory
             </span>
           )}
         </div>
       )}
-
-      {/* Approval payload preview */}
       {event.sourceType === 'approval' && event.approvalPayload && Object.keys(event.approvalPayload).length > 0 && (
         <div className="p-2 rounded bg-background/60 border border-border/30">
-          <pre className="text-[9px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-24 overflow-y-auto">
+          <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-32 overflow-y-auto">
             {JSON.stringify(event.approvalPayload, null, 2)}
           </pre>
         </div>
       )}
-
-      {/* No detail available */}
       {!descriptionText && !hasArtifacts && event.sourceType !== 'approval' && (
-        <p className="text-[9px] text-muted-foreground/60 italic">No additional details available</p>
+        <p className="text-[10px] text-muted-foreground/60 italic">No additional details available</p>
       )}
     </div>
   );
 };
 
-// ─── Component ──────────────────────────────────────────────────────────────
+// ─── Shared data hook ───────────────────────────────────────────────────────
 
-const ActivityFeed = () => {
+function useActivityEvents() {
   const [events, setEvents] = useState<FeedEvent[]>([]);
   const [loading, setLoading] = useState(true);
-  const [collapsed, setCollapsed] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetchEvents = useCallback(async () => {
     try {
@@ -308,26 +292,62 @@ const ActivityFeed = () => {
     return () => { supabase.removeChannel(ch); };
   }, [fetchEvents]);
 
-  return (
-    <div className={`activity-feed-panel ${collapsed ? 'collapsed' : ''}`}>
-      <button
-        onClick={() => setCollapsed(c => !c)}
-        className="flex items-center justify-between px-3 py-2 shrink-0 hover:bg-secondary/30 transition-colors"
-      >
-        <div className="flex items-center gap-1.5">
-          <Activity size={11} className="text-primary" />
-          <span className="text-[10px] font-bold text-foreground tracking-wide uppercase">Activity</span>
-          {events.length > 0 && <span className="text-[9px] text-muted-foreground">{events.length}</span>}
-        </div>
-        {collapsed ? <ChevronUp size={11} className="text-muted-foreground" /> : <ChevronDown size={11} className="text-muted-foreground" />}
-      </button>
+  return { events, loading };
+}
 
-      {!collapsed && (
-        <div className="flex-1 overflow-y-auto px-3 pb-2">
+// ─── Trigger Button (floating in bottom-right of control room) ──────────────
+
+export const ActivityFeedTrigger = ({ onClick, count }: { onClick: () => void; count: number }) => (
+  <div className="absolute bottom-3 right-3 z-20">
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-card/90 backdrop-blur-sm border border-border shadow-md hover:shadow-lg hover:bg-card transition-all"
+    >
+      <Activity size={14} className="text-primary" />
+      <span className="text-xs font-semibold text-foreground">Activity</span>
+      {count > 0 && (
+        <span className="text-[10px] font-bold text-primary-foreground bg-primary rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+          {count}
+        </span>
+      )}
+    </button>
+  </div>
+);
+
+// ─── Full Panel (renders in side-panel slot) ────────────────────────────────
+
+export const ActivityFeedPanel = ({ onClose }: { onClose: () => void }) => {
+  const { events, loading } = useActivityEvents();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  return (
+    <div className="w-[400px] h-full border-l border-border flex flex-col bg-card">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
+        <div className="flex items-center gap-2">
+          <Activity size={16} className="text-primary" />
+          <span className="text-sm font-bold text-foreground tracking-wide">Activity Feed</span>
+          {events.length > 0 && (
+            <span className="text-[10px] font-bold text-primary-foreground bg-primary rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
+              {events.length}
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onClose}
+          className="p-1.5 rounded-lg hover:bg-secondary transition-colors text-muted-foreground hover:text-foreground"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* Events list */}
+      <ScrollArea className="flex-1">
+        <div className="p-3">
           {loading ? (
-            <div className="flex items-center justify-center py-6 text-muted-foreground text-[10px]">Loading…</div>
+            <div className="flex items-center justify-center py-12 text-muted-foreground text-xs">Loading…</div>
           ) : events.length === 0 ? (
-            <div className="flex items-center justify-center py-6 text-muted-foreground text-[10px]">No activity yet</div>
+            <div className="flex items-center justify-center py-12 text-muted-foreground text-xs">No activity yet</div>
           ) : (
             <div className="space-y-0">
               {events.map(event => {
@@ -338,13 +358,13 @@ const ActivityFeed = () => {
                   <div key={event.id} className="border-b border-border/30 last:border-0">
                     <button
                       onClick={() => setExpandedId(isExpanded ? null : event.id)}
-                      className="flex items-start gap-2 py-1.5 w-full text-left hover:bg-secondary/20 rounded-sm transition-colors -mx-1 px-1"
+                      className="flex items-start gap-2.5 py-2.5 w-full text-left hover:bg-secondary/20 rounded-md transition-colors px-2 -mx-1"
                     >
-                      <div className={`mt-0.5 shrink-0 ${className}`}><Icon size={10} /></div>
-                      <p className={`flex-1 text-[10px] leading-snug text-foreground/85 min-w-0 ${isExpanded ? '' : 'truncate'}`}>{event.summary}</p>
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: actorD.color }} />
-                        <span className="text-[9px] text-muted-foreground">{relativeTime(event.timestamp)}</span>
+                      <div className={`mt-0.5 shrink-0 ${className}`}><Icon size={14} /></div>
+                      <p className="flex-1 text-xs leading-relaxed text-foreground/90 min-w-0">{event.summary}</p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: actorD.color }} />
+                        <span className="text-[10px] text-muted-foreground whitespace-nowrap">{relativeTime(event.timestamp)}</span>
                       </div>
                     </button>
                     {isExpanded && <EventDetail event={event} />}
@@ -354,9 +374,16 @@ const ActivityFeed = () => {
             </div>
           )}
         </div>
-      )}
+      </ScrollArea>
     </div>
   );
+};
+
+// ─── Default export (trigger only — for backward compat in control room) ────
+
+const ActivityFeed = ({ onOpen }: { onOpen: () => void }) => {
+  const { events } = useActivityEvents();
+  return <ActivityFeedTrigger onClick={onOpen} count={events.length} />;
 };
 
 export default ActivityFeed;
