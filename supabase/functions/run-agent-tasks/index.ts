@@ -350,9 +350,20 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
     const workspaceId = task.workspace_id;
     const parentDepth = task.depth || 0;
 
-    // --- TASKS: depth limit + deduplication ---
+    // --- TASKS: depth limit + deduplication + run/parent caps ---
     const taskRows: Record<string, unknown>[] = [];
+    let subtasksForThisParent = 0;
     for (const t of parsed.suggested_tasks || []) {
+      // Cap: max tasks created across entire run
+      if (tasksCreatedSoFar + taskRows.length >= MAX_TASKS_PER_RUN) {
+        console.log(`[run-cap] MAX_TASKS_PER_RUN (${MAX_TASKS_PER_RUN}) reached, skipping: "${t.title}"`);
+        break;
+      }
+      // Cap: max subtasks per parent task
+      if (subtasksForThisParent >= MAX_SUBTASKS_PER_PARENT) {
+        console.log(`[parent-cap] MAX_SUBTASKS_PER_PARENT (${MAX_SUBTASKS_PER_PARENT}) reached for "${task.title}", skipping: "${t.title}"`);
+        break;
+      }
       if (parentDepth >= 3) {
         console.log(`[depth-limit] Skipping child task at depth ${parentDepth + 1}: "${t.title}"`);
         await insertBatch("agent_insights", [{
@@ -388,6 +399,7 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
           depth: parentDepth + 1,
           created_by: "agent",
         });
+        subtasksForThisParent++;
       }
     }
 
