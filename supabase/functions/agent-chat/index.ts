@@ -24,25 +24,26 @@ const COMPANY_CONTEXT: Record<string, string> = {
   inbox: "Inbox Agent — Jon Morrison's unified email management system. Manages two Gmail accounts (jon@getclear.ca and jon@brandsinblooms.com). Responsible for triaging, summarizing, and drafting email responses across both accounts.",
 };
 
-// ─── ROLE RESPONSIBILITY ────────────────────────────────────────────────────
+// ─── ROLE RESPONSIBILITY (owns + does NOT own) ─────────────────────────────
 const ROLE_RESPONSIBILITY: Record<string, string> = {
-  bloomsuite: "You own all BloomSuite marketing, content strategy, lead generation, campaign creation, social media management, and garden centre business optimization. You are the marketing brain for BloomSuite.",
-  clinicleader: "You are the founding agent — you own everything: marketing, sales, support, product, and operations for ClinicLeader. You handle lead qualification from ClinicStructure Score assessments, product guidance, scorecard setup, and operational maturity consulting.",
-  projectpath: "You own all ProjectPath product support, construction project management guidance, feature consultation, technical architecture questions, and construction industry advisory.",
-  disc: "You own all DISC assessment creation, team report generation, behavioral analysis, communication coaching, and public content strategy for the DISC app.",
-  inbox: "You own email triage, prioritization, drafting replies, and inbox management across all of Jon's email accounts. You are the gatekeeper of Jon's communication.",
+  bloomsuite: "**Owns:** All BloomSuite marketing, content strategy, lead generation, campaign creation, social media management, and garden centre business optimization. You are the marketing brain for BloomSuite.\n**Does NOT own:** ClinicLeader, ProjectPath, DISC, or Inbox operations. Do not attempt work outside the BloomSuite workspace.",
+  clinicleader: "**Owns:** Everything for ClinicLeader as the founding agent — marketing, sales, support, product, and operations. Lead qualification from ClinicStructure Score assessments, product guidance, scorecard setup, and operational maturity consulting.\n**Does NOT own:** BloomSuite, ProjectPath, DISC, or Inbox operations. Do not attempt work outside the ClinicLeader workspace.",
+  projectpath: "**Owns:** All ProjectPath product support, construction project management guidance, feature consultation, technical architecture, and construction industry advisory.\n**Does NOT own:** BloomSuite, ClinicLeader, DISC, or Inbox operations. Do not attempt work outside the ProjectPath workspace.",
+  disc: "**Owns:** All DISC assessment creation, team report generation, behavioral analysis, communication coaching, and public content strategy for the DISC app.\n**Does NOT own:** BloomSuite, ClinicLeader, ProjectPath, or Inbox operations. Do not attempt work outside the DISC workspace.",
+  inbox: "**Owns:** Email triage, prioritization, drafting replies, and inbox management across all of Jon's email accounts. You are the gatekeeper of Jon's communication.\n**Does NOT own:** Product-specific marketing, development, or strategy for BloomSuite, ClinicLeader, ProjectPath, or DISC. Route product-specific requests to the appropriate agent.",
 };
 
 // ─── OPERATIONAL RULES ──────────────────────────────────────────────────────
 const OPERATIONAL_RULES = `## Operational Rules
 - Perform internal analysis, research, and drafting automatically without asking permission.
-- Do NOT claim actions were completed unless they actually were. If you drafted something, say "drafted" not "sent."
-- Social media posts REQUIRE Jon's approval before publishing. Never claim a post was published.
-- Outbound emails REQUIRE Jon's approval before sending. You may save drafts but must flag them for review.
-- Be concise, structured, and action-oriented. Lead with the answer, then provide detail.
+- Do NOT claim actions were completed unless they actually were. If you drafted something, say "drafted" not "sent." If you suggest a task, say "suggested" not "created."
+- Create tasks when work should be tracked — suggest them explicitly with a clear title and description.
+- Create approval candidates for outbound emails and social drafts — never send or publish directly.
+- Public-facing social content REQUIRES Jon's approval before publishing.
+- Outbound email REQUIRES Jon's approval before sending. You may save drafts but must flag them for review.
+- Be concise, structured, and action-oriented. Lead with the answer, then provide supporting detail.
 - When work is complex, break it into discrete tasks or draft artifacts rather than walls of text.
-- If you identify work that should become a tracked task, suggest it explicitly.
-- If you produce content that needs approval (email drafts, social posts), flag it as an approval candidate.`;
+- Prefer turning work into trackable outputs (tasks, drafts, approval items) over conversational promises.`;
 
 // ─── OUTPUT GUIDANCE ────────────────────────────────────────────────────────
 const OUTPUT_GUIDANCE = `## Output Guidance
@@ -60,29 +61,35 @@ interface ScaffoldInput {
   skillContent: string;
   inboxContext?: string;
   activeTasks?: string;
+  pendingApprovals?: string;
 }
 
 function buildPromptScaffold(input: ScaffoldInput): string {
   const sections: string[] = [];
   const agentLabel = agentId_toLabel(input.agentId);
+  const sectionNames: string[] = [];
 
   // A. Agent Identity
-  sections.push(`## Agent Identity\nYou are the **${agentLabel}** agent for **Jon Morrison**.`);
+  sections.push(`## Agent Identity\nYou are the **${agentLabel}** agent working for **Jon Morrison**.`);
+  sectionNames.push("A:Identity");
 
-  // B. Company Context
+  // B. Workspace Context
   const companyCtx = COMPANY_CONTEXT[input.agentId];
   if (companyCtx) {
-    sections.push(`## Company Context\n${companyCtx}`);
+    sections.push(`## Workspace Context\n${companyCtx}`);
+    sectionNames.push("B:Workspace");
   }
 
-  // C. Role Responsibility
+  // C. Responsibility Scope
   const roleResp = ROLE_RESPONSIBILITY[input.agentId];
   if (roleResp) {
-    sections.push(`## Role Responsibility\n${roleResp}`);
+    sections.push(`## Responsibility Scope\n${roleResp}`);
+    sectionNames.push("C:Responsibility");
   }
 
   // D. Operational Rules
   sections.push(OPERATIONAL_RULES);
+  sectionNames.push("D:Rules");
 
   // E. Current Date and Time
   const now = new Date();
@@ -94,35 +101,51 @@ function buildPromptScaffold(input: ScaffoldInput): string {
     hour: "2-digit", minute: "2-digit", timeZone: "America/Toronto", hour12: true,
   });
   sections.push(`## Current Date & Time\n${dateStr} at ${timeStr} (Eastern)`);
+  sectionNames.push("E:DateTime");
 
   // F. Active Tasks
   if (input.activeTasks && input.activeTasks.length > 0) {
     sections.push(`## Active Tasks\nThe following tasks are currently open for your role:\n\n${input.activeTasks}`);
+    sectionNames.push("F:Tasks(populated)");
   } else {
     sections.push(`## Active Tasks\nNo active tasks currently assigned.`);
+    sectionNames.push("F:Tasks(empty)");
   }
 
-  // G. Memory Placeholder
-  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
+  // G. Pending Approvals
+  if (input.pendingApprovals && input.pendingApprovals.length > 0) {
+    sections.push(`## Pending Approvals\nThe following items are awaiting Jon's approval for your workspace:\n\n${input.pendingApprovals}`);
+    sectionNames.push("G:Approvals(populated)");
+  } else {
+    sections.push(`## Pending Approvals\nNo items currently awaiting approval.`);
+    sectionNames.push("G:Approvals(empty)");
+  }
 
-  // H. Inbox / Live Context (agent-specific, injected before skills)
+  // H. Memory Placeholder
+  sections.push(`## Relevant Memory\nRelevant memory: none available yet.`);
+  sectionNames.push("H:Memory");
+
+  // Inbox / Live Context (agent-specific, injected before skills)
   if (input.inboxContext) {
     sections.push(input.inboxContext);
+    sectionNames.push("LiveContext:Inbox");
   }
 
   // I. Skill Modules
   if (input.skillContent) {
     sections.push(`## Skill Modules\n${input.skillContent}`);
+    sectionNames.push("I:Skills");
   }
 
   // J. Output Guidance
   sections.push(OUTPUT_GUIDANCE);
+  sectionNames.push("J:Output");
 
   const assembled = sections.join("\n\n---\n\n");
 
   // Debug logging
   console.log(`[prompt-scaffold] Agent: ${input.agentId}`);
-  console.log(`[prompt-scaffold] Sections: ${sections.length}`);
+  console.log(`[prompt-scaffold] Sections (${sectionNames.length}): ${sectionNames.join(" → ")}`);
   console.log(`[prompt-scaffold] Total length: ${assembled.length} chars`);
 
   return assembled;
@@ -199,6 +222,42 @@ async function loadActiveTasks(agentId: string): Promise<string> {
     }).join("\n");
   } catch (e) {
     console.error("[tasks] Error loading active tasks:", e);
+    return "";
+  }
+}
+
+// ─── PENDING APPROVALS LOADER ───────────────────────────────────────────────
+
+async function loadPendingApprovals(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/approvals?agent_role=eq.${agentId}&status=eq.pending&order=created_at.desc&limit=5`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[approvals] Failed to fetch approvals: ${res.status}`);
+      return "";
+    }
+    const approvals = await res.json();
+    if (!approvals || approvals.length === 0) return "";
+
+    console.log(`[approvals] Found ${approvals.length} pending approvals for ${agentId}`);
+    return approvals.map((a: any, i: number) => {
+      const type = a.approval_type || "unknown";
+      const title = a.title || "Untitled";
+      const preview = a.preview_text ? ` — "${a.preview_text.slice(0, 80)}"` : "";
+      return `${i + 1}. [${type.toUpperCase()}] ${title}${preview}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[approvals] Error loading pending approvals:", e);
     return "";
   }
 }
@@ -340,10 +399,11 @@ serve(async (req) => {
       );
     }
 
-    // Load skills, tasks, and inbox context in parallel
-    const [skillContent, activeTasks, inboxContext] = await Promise.all([
+    // Load skills, tasks, approvals, and inbox context in parallel
+    const [skillContent, activeTasks, pendingApprovals, inboxContext] = await Promise.all([
       loadSkillModules(agentId, GITHUB_TOKEN),
       loadActiveTasks(agentId),
+      loadPendingApprovals(agentId),
       (agentId === "bloomsuite")
         ? buildBloomsuiteInboxContext().catch(e => {
             console.error("[inbox-ctx] BloomSuite error:", e);
@@ -363,6 +423,7 @@ serve(async (req) => {
       skillContent,
       inboxContext: inboxContext || undefined,
       activeTasks,
+      pendingApprovals,
     });
 
     console.log(`[agent-chat] System prompt assembled: ${systemPrompt.length} chars`);
