@@ -32,7 +32,7 @@ interface DailyStandupProps {
   }) => Promise<unknown>;
 }
 
-const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
+const DailyStandup = ({ onApproved, onDismiss, onCreateTask }: DailyStandupProps) => {
   const [phase, setPhase] = useState<StandupPhase>('walking-in');
   const [presentingIndex, setPresentingIndex] = useState(0);
   const [suggestions, setSuggestions] = useState<Record<string, string>>(FALLBACK_SUGGESTIONS);
