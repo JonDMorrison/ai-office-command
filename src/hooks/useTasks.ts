@@ -59,30 +59,32 @@ export function useTasks() {
     input_payload?: Record<string, unknown>;
   }) => {
     try {
-      const { data, error } = await supabase
+      const row = {
+        company_id: COMPANY_ID,
+        agent_role: task.agent_role,
+        title: task.title,
+        description: task.description || null,
+        task_type: task.task_type || 'general',
+        source: task.source || 'standup',
+        priority: task.priority || 3,
+        status: 'approved',
+        input_payload: (task.input_payload || {}) as unknown as Record<string, unknown>,
+      };
+
+      const { data, error } = await (supabase
         .from('tasks')
-        .insert({
-          company_id: COMPANY_ID,
-          agent_role: task.agent_role,
-          title: task.title,
-          description: task.description || null,
-          task_type: task.task_type || 'general',
-          source: task.source || 'standup',
-          priority: task.priority || 3,
-          status: 'approved',
-          input_payload: task.input_payload || {},
-        })
+        .insert(row as any)
         .select()
-        .single();
+        .single());
 
       if (error) throw error;
 
       // Also log an event
-      await supabase.from('task_events').insert({
-        task_id: (data as Task).id,
+      await (supabase.from('task_events').insert({
+        task_id: (data as any).id,
         event_type: 'created',
         event_payload: { source: task.source || 'standup' },
-      });
+      } as any));
 
       setTasks(prev => [(data as Task), ...prev]);
       return data as Task;
