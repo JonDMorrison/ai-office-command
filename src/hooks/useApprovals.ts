@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { COMPANY_ID } from '@/lib/constants';
 
 export interface Approval {
   id: string;
