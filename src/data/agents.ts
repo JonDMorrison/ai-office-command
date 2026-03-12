@@ -84,6 +84,7 @@ You are friendly, knowledgeable about horticulture and garden centre retail, and
     name: 'ClinicLeader',
     role: 'Founding Agent — Clinic Ops',
     product: 'ClinicLeader',
+    workspaceId: 'clinicleader',
     colorVar: 'agent-clinic',
     colorHex: '#3b82f6',
     avatar: '🏥',
