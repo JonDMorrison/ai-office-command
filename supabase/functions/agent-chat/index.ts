@@ -195,8 +195,8 @@ async function buildSystemPrompt(
       ? fetch(`${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=created_at.desc&limit=10&select=title,status,priority,urgency_score,impact_score`, { headers })
       : fetch(`${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress,waiting_for_input,blocked)&order=execution_priority.desc.nullslast,created_at.desc&limit=20&select=title,status,priority,urgency_score,impact_score`, { headers }),
     workspaceId
-      ? fetch(`${baseUrl}/rest/v1/agent_memories?workspace_id=eq.${workspaceId}&order=created_at.desc&limit=15&select=memory_text,memory_type,confidence`, { headers })
-      : fetch(`${baseUrl}/rest/v1/agent_memories?order=created_at.desc&limit=30&select=memory_text,memory_type,confidence`, { headers }),
+      ? fetch(`${baseUrl}/rest/v1/ranked_memories?workspace_id=eq.${workspaceId}&order=effective_importance.desc&limit=15&select=id,memory_text,memory_type,confidence,effective_importance`, { headers })
+      : fetch(`${baseUrl}/rest/v1/ranked_memories?order=effective_importance.desc&limit=30&select=id,memory_text,memory_type,confidence,effective_importance`, { headers }),
     workspaceId
       ? fetch(`${baseUrl}/rest/v1/approvals?workspace_id=eq.${workspaceId}&status=eq.pending&order=created_at.desc&limit=5&select=title,approval_type,preview_text`, { headers })
       : fetch(`${baseUrl}/rest/v1/approvals?status=eq.pending&order=created_at.desc&limit=10&select=title,approval_type,preview_text`, { headers }),
