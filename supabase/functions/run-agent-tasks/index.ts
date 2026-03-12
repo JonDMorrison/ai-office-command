@@ -197,9 +197,13 @@ function buildExecutionPrompt(
     timeZone: "America/Toronto",
   });
 
+  const identity = workspace
+    ? `You are the ${task.agent_role} agent for Jon Morrison's ${workspace.name} business.`
+    : `You are the ${task.agent_role} agent for Jon Morrison.`;
+
   return `
 ## Identity
-You are the ${task.agent_role} agent for Jon Morrison${workspace ? \`'s ${workspace.name} business\` : ''}.
+${identity}
 Today is ${dateStr}.
 
 ## Workspace
@@ -226,7 +230,7 @@ If you cannot complete this task, explain exactly what is blocking you.
 ## Response Format
 Respond with a JSON block:
 
-\\\`\\\`\\\`json
+\`\`\`json
 {
   "message": "Summary of what you did",
   "output": "The actual deliverable content if applicable",
@@ -235,7 +239,7 @@ Respond with a JSON block:
   "suggested_memories": ["Jon prefers..."],
   "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
 }
-\\\`\\\`\\\`
+\`\`\`
 
 ## Memory Rules
 Only store memories that reference Jon's actual words or decisions.
