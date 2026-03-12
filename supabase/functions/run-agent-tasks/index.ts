@@ -5,6 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── SAFETY LIMITS ──────────────────────────────────────────────────────────
+const MAX_TASKS_PER_RUN = 10;
+const MAX_SUBTASKS_PER_PARENT = 5;
+
 // ─── SKILL MAPPING ──────────────────────────────────────────────────────────
 const AGENT_SKILLS: Record<string, string[]> = {
   bloomsuite: ["joncoach-core", "bloomsuite-agent", "bloomsuite-copywriting", "brainstorming", "frontend-design"],
