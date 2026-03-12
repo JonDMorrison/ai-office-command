@@ -72,15 +72,15 @@ export function useTasks() {
       };
 
       const { data, error } = await (supabase
-        .from('tasks')
+        .from('tasks' as any)
         .insert(row as any)
         .select()
-        .single());
+        .single() as any);
 
       if (error) throw error;
 
       // Also log an event
-      await (supabase.from('task_events').insert({
+      await (supabase.from('task_events' as any).insert({
         task_id: (data as any).id,
         event_type: 'created',
         event_payload: { source: task.source || 'standup' },
