@@ -237,15 +237,13 @@ interface PixelAgentProps {
 }
 
 const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = false }: PixelAgentProps) => {
-  const { state, taskIndex, standupOverride } = dynamicState;
-  const isTyping = state === 'typing';
-  const isReading = state === 'reading';
-  const isActive = isTyping || isReading;
+  const { state, taskIndex, standupOverride, activeTaskTitle } = dynamicState;
+  const isActive = state === 'working' || state === 'needs_input' || state === 'blocked';
 
   const bubble = standupOverride
     ? { bg: '#f0fdf4', border: '#22c55e', label: '✦ Working on it...' }
     : getBubbleStyle(state);
-  const showTaskText = !standupOverride && (isTyping || isReading);
+  const showTaskText = !standupOverride && isActive && activeTaskTitle;
 
   return (
     <div
