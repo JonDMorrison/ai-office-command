@@ -34,6 +34,18 @@ const getBubbleStyle = (state: string) => {
   }
 };
 
+/** Map agent state to the right animation class */
+function getCharacterAnimation(state: string, isWalking: boolean): string {
+  if (isWalking) return 'walk-sway 0.4s ease-in-out infinite';
+  switch (state) {
+    case 'working': return 'typing-shift 0.35s ease-in-out infinite';
+    case 'needs_input': return 'thinking-tilt 2.5s ease-in-out infinite';
+    case 'blocked': return 'thinking-tilt 3s ease-in-out infinite';
+    case 'waiting': return 'idle-breathe 3s ease-in-out infinite';
+    default: return 'idle-breathe 3s ease-in-out infinite';
+  }
+}
+
 interface PixelAgentProps {
   agent: Agent;
   onClick: () => void;
@@ -45,17 +57,19 @@ interface PixelAgentProps {
 const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = false }: PixelAgentProps) => {
   const { state, taskIndex, standupOverride, activeTaskTitle } = dynamicState;
   const isActive = state === 'working' || state === 'needs_input' || state === 'blocked';
+  const isExecutive = agent.id === 'executive';
 
   const bubble = standupOverride
     ? { bg: 'hsl(142 76% 96%)', border: 'hsl(142 71% 45%)', label: '✦ Working on it...' }
     : getBubbleStyle(state);
   const showTaskText = !standupOverride && isActive && activeTaskTitle;
+  const isWaitingApproval = state === 'waiting';
 
   const agentImage = AGENT_IMAGES[agent.id] || AGENT_IMAGES.bloomsuite;
 
   return (
     <div
-      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''}`}
+      className={`desk-pod ${isSelected ? 'selected' : ''} ${isActive ? 'active' : ''} ${isExecutive ? 'executive-desk' : ''}`}
       onClick={onClick}
     >
       {/* Glow ring */}
@@ -64,9 +78,9 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         style={{ boxShadow: `0 0 28px 6px ${agent.colorHex}25, inset 0 0 0 2px ${agent.colorHex}30` }}
       />
 
-      {/* Status bubble */}
+      {/* Status bubble — bounces when waiting for approval */}
       <div
-        className="absolute -top-14 left-1/2 z-20 animate-bubble-appear"
+        className={`absolute -top-14 left-1/2 z-20 ${isWaitingApproval ? 'animate-bubble-bounce' : 'animate-bubble-appear'}`}
         style={{
           transform: 'translateX(-50%)',
           minWidth: '140px',
@@ -99,16 +113,14 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         />
       </div>
 
-      {/* Character — sits behind desk */}
+      {/* Character — state-driven animation */}
       <div
         className="relative z-10 flex items-end justify-center"
         style={{
-          width: '160px',
-          height: '120px',
-          marginBottom: '-28px', /* overlap with desk to feel anchored */
-          animation: isWalking
-            ? 'walk-sway 0.4s ease-in-out infinite'
-            : 'idle-float 2.5s ease-in-out infinite',
+          width: isExecutive ? '170px' : '160px',
+          height: isExecutive ? '130px' : '120px',
+          marginBottom: '-28px',
+          animation: getCharacterAnimation(state, isWalking),
         }}
       >
         <img
@@ -116,17 +128,27 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
           alt={agent.name}
           className="agent-avatar-img"
           style={{
-            width: '120px',
-            height: '120px',
+            width: isExecutive ? '130px' : '120px',
+            height: isExecutive ? '130px' : '120px',
             objectFit: 'contain',
             objectPosition: 'bottom',
             filter: isActive
-              ? `drop-shadow(0 4px 12px ${agent.colorHex}40)`
+              ? `drop-shadow(0 4px 14px ${agent.colorHex}45)`
               : 'drop-shadow(0 2px 6px hsla(0, 0%, 0%, 0.1))',
             transition: 'filter 0.3s ease',
           }}
           draggable={false}
         />
+
+        {/* Delegation envelope animation */}
+        {state === 'working' && dynamicState.activeTaskTitle?.toLowerCase().includes('delegat') && (
+          <div
+            className="absolute bottom-8 right-0 animate-envelope-fly pointer-events-none"
+            style={{ fontSize: '16px' }}
+          >
+            ✉️
+          </div>
+        )}
       </div>
 
       {/* Desk */}
@@ -134,7 +156,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         <div className="iso-desk-surface" />
         <div className="iso-monitor">
           <div
-            className="iso-monitor-glow"
+            className={`iso-monitor-glow ${state === 'working' ? 'monitor-glow-active' : ''}`}
             style={{
               background: isActive
                 ? `linear-gradient(135deg, ${agent.colorHex}50, ${agent.colorHex}25)`
@@ -146,7 +168,10 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
 
       {/* Nameplate */}
       <div className="iso-nameplate mt-2">
-        <div className="text-xs font-semibold leading-tight" style={{ color: agent.colorHex }}>
+        <div
+          className="font-semibold leading-tight"
+          style={{ color: agent.colorHex, fontSize: isExecutive ? '13px' : '12px' }}
+        >
           {agent.name}
         </div>
         <div className="text-[9px] text-muted-foreground leading-tight mt-0.5">
