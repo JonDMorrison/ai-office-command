@@ -1,7 +1,22 @@
-import { useEffect } from 'react';
-import { X, Check, XCircle, Mail, Share2, FileText, Clock } from 'lucide-react';
-import { useApprovals, Approval } from '@/hooks/useApprovals';
+import { useEffect, useState } from 'react';
+import { X, Check, XCircle, Mail, Share2, FileText, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { agents } from '@/data/agents';
+
+interface Approval {
+  id: string;
+  workspace_id: string;
+  agent_role: string;
+  approval_type: string;
+  title: string;
+  preview_text: string | null;
+  full_payload: Record<string, unknown>;
+  status: string;
+  created_at: string;
+  updated_at: string;
+  approved_at: string | null;
+  rejected_at: string | null;
+}
 
 interface ApprovalQueueProps {
   onClose: () => void;
@@ -10,20 +25,28 @@ interface ApprovalQueueProps {
 const TYPE_CONFIG: Record<string, { label: string; icon: typeof Mail; color: string }> = {
   email_draft: { label: 'Email Draft', icon: Mail, color: 'hsl(var(--agent-inbox))' },
   social_post: { label: 'Social Post', icon: Share2, color: 'hsl(var(--agent-bloom))' },
+  blog_post: { label: 'Blog Post', icon: FileText, color: 'hsl(var(--primary))' },
+  ad_copy: { label: 'Ad Copy', icon: FileText, color: 'hsl(var(--primary))' },
   general: { label: 'Draft', icon: FileText, color: 'hsl(var(--primary))' },
 };
 
 const getTypeConfig = (type: string) =>
-  TYPE_CONFIG[type] || { label: type, icon: FileText, color: 'hsl(var(--primary))' };
+  TYPE_CONFIG[type] || { label: type.replace(/_/g, ' '), icon: FileText, color: 'hsl(var(--primary))' };
 
 const ApprovalCard = ({
   item,
+  isExpanded,
+  onToggleExpand,
   onApprove,
   onReject,
+  isProcessing,
 }: {
   item: Approval;
+  isExpanded: boolean;
+  onToggleExpand: () => void;
   onApprove: () => void;
   onReject: () => void;
+  isProcessing: boolean;
 }) => {
   const agent = agents.find(a => a.id === item.agent_role);
   const config = getTypeConfig(item.approval_type);
@@ -47,14 +70,22 @@ const ApprovalCard = ({
           </div>
           <span className="text-xs font-medium text-muted-foreground">{config.label}</span>
         </div>
-        {agent && (
-          <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: agent.colorHex + '18', color: agent.colorHex }}
+        <div className="flex items-center gap-2">
+          {agent && (
+            <span
+              className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ backgroundColor: agent.colorHex + '18', color: agent.colorHex }}
+            >
+              {agent.name}
+            </span>
+          )}
+          <button
+            onClick={onToggleExpand}
+            className="p-1 rounded hover:bg-secondary transition-colors text-muted-foreground"
           >
-            {agent.name}
-          </span>
-        )}
+            {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          </button>
+        </div>
       </div>
 
       {/* Title */}
@@ -62,9 +93,20 @@ const ApprovalCard = ({
 
       {/* Preview */}
       {item.preview_text && (
-        <p className="text-xs text-muted-foreground leading-relaxed mb-3 line-clamp-3">
+        <p className={`text-xs text-muted-foreground leading-relaxed mb-3 ${isExpanded ? '' : 'line-clamp-3'}`}>
           {item.preview_text}
         </p>
+      )}
+
+      {/* Expanded full payload */}
+      {isExpanded && item.full_payload && Object.keys(item.full_payload).length > 0 && (
+        <div className="mb-3 p-2.5 rounded-lg bg-secondary/50 border border-border">
+          <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
+            {typeof item.full_payload === 'string'
+              ? item.full_payload
+              : JSON.stringify(item.full_payload, null, 2)}
+          </pre>
+        </div>
       )}
 
       {/* Actions */}
@@ -72,15 +114,17 @@ const ApprovalCard = ({
         <div className="flex gap-2">
           <button
             onClick={onApprove}
+            disabled={isProcessing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-              bg-primary text-primary-foreground hover:opacity-90 transition-colors"
+              bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-50 transition-colors"
           >
-            <Check size={13} /> Approve
+            <Check size={13} /> {isProcessing ? 'Saving...' : 'Approve'}
           </button>
           <button
             onClick={onReject}
+            disabled={isProcessing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium
-              bg-secondary text-secondary-foreground hover:bg-accent transition-colors"
+              bg-secondary text-secondary-foreground hover:bg-accent disabled:opacity-50 transition-colors"
           >
             <XCircle size={13} /> Reject
           </button>
@@ -95,11 +139,97 @@ const ApprovalCard = ({
 };
 
 const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
-  const { approvals, loading, fetchApprovals, approveItem, rejectItem } = useApprovals();
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const loadApprovals = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await (supabase
+        .from('approvals' as any)
+        .select('*') as any)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setApprovals((data as Approval[]) || []);
+    } catch (err) {
+      console.error('Failed to fetch approvals:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    fetchApprovals();
-  }, [fetchApprovals]);
+    loadApprovals();
+
+    // Realtime — update panel live when agents create approvals
+    const channel = supabase
+      .channel('approvals-realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'approvals' },
+        () => loadApprovals()
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const handleApprove = async (item: Approval) => {
+    setProcessingId(item.id);
+    try {
+      // For email drafts, save to Gmail via edge function
+      if (item.approval_type === 'email_draft') {
+        await supabase.functions.invoke('save-gmail-draft', {
+          body: {
+            workspaceId: item.workspace_id,
+            payload: item.full_payload,
+          },
+        });
+      }
+
+      await (supabase
+        .from('approvals' as any)
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+        } as any)
+        .eq('id', item.id) as any);
+
+      setApprovals(prev =>
+        prev.map(a => a.id === item.id ? { ...a, status: 'approved', approved_at: new Date().toISOString() } : a)
+      );
+    } catch (err) {
+      console.error('Failed to approve:', err);
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (id: string) => {
+    setProcessingId(id);
+    try {
+      await (supabase
+        .from('approvals' as any)
+        .update({
+          status: 'rejected',
+          rejected_at: new Date().toISOString(),
+        } as any)
+        .eq('id', id) as any);
+
+      setApprovals(prev =>
+        prev.map(a => a.id === id ? { ...a, status: 'rejected', rejected_at: new Date().toISOString() } : a)
+      );
+    } catch (err) {
+      console.error('Failed to reject:', err);
+    } finally {
+      setProcessingId(null);
+    }
+  };
 
   const pending = approvals.filter(a => a.status === 'pending');
   const resolved = approvals.filter(a => a.status !== 'pending');
@@ -151,8 +281,11 @@ const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
                     <ApprovalCard
                       key={item.id}
                       item={item}
-                      onApprove={() => approveItem(item.id)}
-                      onReject={() => rejectItem(item.id)}
+                      isExpanded={expandedId === item.id}
+                      onToggleExpand={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                      onApprove={() => handleApprove(item)}
+                      onReject={() => handleReject(item.id)}
+                      isProcessing={processingId === item.id}
                     />
                   ))}
                 </div>
@@ -169,8 +302,11 @@ const ApprovalQueue = ({ onClose }: ApprovalQueueProps) => {
                     <ApprovalCard
                       key={item.id}
                       item={item}
+                      isExpanded={expandedId === item.id}
+                      onToggleExpand={() => setExpandedId(expandedId === item.id ? null : item.id)}
                       onApprove={() => {}}
                       onReject={() => {}}
+                      isProcessing={false}
                     />
                   ))}
                 </div>
