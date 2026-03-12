@@ -18,6 +18,15 @@ const AGENT_SKILLS: Record<string, string[]> = {
   inbox: ["joncoach-core", "inbox-agent", "internal-comms"],
 };
 
+// ─── AGENT → WORKSPACE MAPPING ─────────────────────────────────────────────
+const AGENT_WORKSPACE: Record<string, string | null> = {
+  bloomsuite: "bloomsuite",
+  clinicleader: "clinicleader",
+  projectpath: "projectpath",
+  disc: "disc",
+  inbox: null,
+  executive: null,
+
 // ─── TYPES ──────────────────────────────────────────────────────────────────
 
 interface Task {
