@@ -226,6 +226,42 @@ async function loadActiveTasks(agentId: string): Promise<string> {
   }
 }
 
+// ─── PENDING APPROVALS LOADER ───────────────────────────────────────────────
+
+async function loadPendingApprovals(agentId: string): Promise<string> {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+    if (!supabaseUrl || !supabaseKey) return "";
+
+    const url = `${supabaseUrl}/rest/v1/approvals?agent_role=eq.${agentId}&status=eq.pending&order=created_at.desc&limit=5`;
+    const res = await fetch(url, {
+      headers: {
+        apikey: supabaseKey,
+        Authorization: `Bearer ${supabaseKey}`,
+        "Content-Type": "application/json",
+      },
+    });
+    if (!res.ok) {
+      console.error(`[approvals] Failed to fetch approvals: ${res.status}`);
+      return "";
+    }
+    const approvals = await res.json();
+    if (!approvals || approvals.length === 0) return "";
+
+    console.log(`[approvals] Found ${approvals.length} pending approvals for ${agentId}`);
+    return approvals.map((a: any, i: number) => {
+      const type = a.approval_type || "unknown";
+      const title = a.title || "Untitled";
+      const preview = a.preview_text ? ` — "${a.preview_text.slice(0, 80)}"` : "";
+      return `${i + 1}. [${type.toUpperCase()}] ${title}${preview}`;
+    }).join("\n");
+  } catch (e) {
+    console.error("[approvals] Error loading pending approvals:", e);
+    return "";
+  }
+}
+
 // ─── GMAIL HELPERS (unchanged logic, extracted for clarity) ──────────────────
 
 async function getGmailAccessToken(refreshToken: string): Promise<string> {
