@@ -327,19 +327,78 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
     
     result.message = parsed.message || fullText.slice(0, 200);
 
-    // Process artifacts in parallel
+    // Process artifacts with guardrails
     const workspaceId = task.workspace_id;
-    const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
-      insertBatch("tasks", (parsed.suggested_tasks || []).map(t => ({
+    const parentDepth = task.depth || 0;
+
+    // --- TASKS: depth limit + deduplication ---
+    const taskRows: Record<string, unknown>[] = [];
+    for (const t of parsed.suggested_tasks || []) {
+      if (parentDepth >= 3) {
+        console.log(`[depth-limit] Skipping child task at depth ${parentDepth + 1}: "${t.title}"`);
+        await insertBatch("agent_insights", [{
+          workspace_id: workspaceId,
+          agent_role: task.agent_role,
+          insight_text: `Task depth limit reached — skipped: ${t.title}`,
+          evidence: `Parent task "${task.title}" is at depth ${parentDepth}`,
+          signal_count: 1,
+          category: "operational",
+        }]);
+        continue;
+      }
+      const similar = await findSimilarActiveTask(workspaceId, t.title || "");
+      if (similar) {
+        console.log(`[task-dedup] Skipping "${t.title}" — similar to "${similar.title}"`);
+        await insertBatch("task_events", [{
+          task_id: similar.id,
+          event_type: "agent_note",
+          event_payload: { note: `${task.agent_role} suggested similar work: "${t.title}"` },
+        }]);
+      } else {
+        taskRows.push({
+          workspace_id: workspaceId,
+          agent_role: task.agent_role,
+          title: (t.title || "Untitled").slice(0, 120),
+          description: t.description || null,
+          task_type: t.task_type || "general",
+          urgency_score: t.urgency_score || 3,
+          impact_score: t.impact_score || 3,
+          status: "queued",
+          source: "agent_task",
+          parent_task_id: task.id,
+          depth: parentDepth + 1,
+          created_by: "agent",
+        });
+      }
+    }
+
+    // --- MEMORIES: quality gate ---
+    const memoryRows = (parsed.suggested_memories || [])
+      .filter(m => shouldStoreMemory(m))
+      .map(m => ({
         workspace_id: workspaceId,
         agent_role: task.agent_role,
-        title: (t.title || "Untitled").slice(0, 120),
-        description: t.description || null,
-        task_type: t.task_type || "general",
-        priority: t.priority || 3,
-        status: "queued",
-        source: "agent_task",
-      }))),
+        memory_text: m,
+        memory_type: "preference",
+        source: "task_execution",
+        confidence: "medium",
+      }));
+
+    // --- INSIGHTS: evidence filter ---
+    const insightRows = (parsed.insights || [])
+      .map(parseInsight)
+      .filter(shouldStoreInsight)
+      .map(ins => ({
+        workspace_id: workspaceId,
+        agent_role: task.agent_role,
+        insight_text: ins.insight_text,
+        evidence: ins.evidence,
+        signal_count: ins.signal_count,
+        category: "general",
+      }));
+
+    const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+      insertBatch("tasks", taskRows),
       insertBatch("approvals", (parsed.suggested_approvals || []).map(a => ({
         workspace_id: workspaceId,
         agent_role: task.agent_role,
@@ -349,19 +408,8 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
         full_payload: { platform: a.platform },
         status: "pending",
       }))),
-      insertBatch("agent_memories", (parsed.suggested_memories || []).map(m => ({
-        workspace_id: workspaceId,
-        agent_role: task.agent_role,
-        memory_text: m,
-        memory_type: "preference",
-        source: "task_execution",
-      }))),
-      insertBatch("agent_insights", (parsed.insights || []).map(i => ({
-        workspace_id: workspaceId,
-        agent_role: task.agent_role,
-        insight_text: i,
-        category: "general",
-      }))),
+      insertBatch("agent_memories", memoryRows),
+      insertBatch("agent_insights", insightRows),
     ]);
 
     result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount };
