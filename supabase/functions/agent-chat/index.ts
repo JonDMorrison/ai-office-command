@@ -280,6 +280,30 @@ Supabase Project: ${workspace.supabase_project_id}`);
     sections.push(`## What You Remember About Jon and This Workspace\n${memoryList}`);
   }
 
+  // 6b. Cross-workspace memory for executive agent
+  if (agentId === 'executive') {
+    try {
+      const crossMemRes = await fetch(
+        `${baseUrl}/rest/v1/agent_memories?order=importance.desc,created_at.desc&limit=30&select=workspace_id,memory_text,memory_type`,
+        { headers }
+      );
+      const allMemories: any[] = crossMemRes.ok ? await crossMemRes.json() : [];
+      if (allMemories.length > 0) {
+        const grouped = allMemories.reduce((acc: Record<string, string[]>, m: any) => {
+          if (!acc[m.workspace_id]) acc[m.workspace_id] = [];
+          acc[m.workspace_id].push(m.memory_text);
+          return acc;
+        }, {});
+        const memorySection = Object.entries(grouped)
+          .map(([ws, mems]) => `**${ws}:**\n${(mems as string[]).map(m => `- ${m}`).join('\n')}`)
+          .join('\n\n');
+        sections.push(`## Cross-Workspace Memory\n${memorySection}`);
+      }
+    } catch (e) {
+      console.error('[executive-memory] Failed to load cross-workspace memories:', e);
+    }
+  }
+
   // 7. Gmail context
   if (gmailContext) {
     sections.push(`## Current Inbox Context\n${gmailContext}`);
