@@ -38,6 +38,62 @@ export type Database = {
         }
         Relationships: []
       }
+      approvals: {
+        Row: {
+          agent_role: string
+          approval_type: string
+          approved_at: string | null
+          company_id: string
+          created_at: string
+          full_payload: Json
+          id: string
+          preview_text: string | null
+          rejected_at: string | null
+          status: string
+          task_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agent_role: string
+          approval_type: string
+          approved_at?: string | null
+          company_id: string
+          created_at?: string
+          full_payload?: Json
+          id?: string
+          preview_text?: string | null
+          rejected_at?: string | null
+          status?: string
+          task_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agent_role?: string
+          approval_type?: string
+          approved_at?: string | null
+          company_id?: string
+          created_at?: string
+          full_payload?: Json
+          id?: string
+          preview_text?: string | null
+          rejected_at?: string | null
+          status?: string
+          task_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approvals_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       task_events: {
         Row: {
           created_at: string
