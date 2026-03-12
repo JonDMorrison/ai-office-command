@@ -61,9 +61,10 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
 
       if (error) throw error;
 
+      const artifacts = data.artifacts_created || undefined;
       setMessages(prev => [
         ...prev,
-        { role: 'assistant', content: data.text || 'No response.' },
+        { role: 'assistant', content: data.text || 'No response.', artifacts },
       ]);
     } catch (err) {
       console.error('Chat error:', err);
