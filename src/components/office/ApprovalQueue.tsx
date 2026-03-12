@@ -99,13 +99,24 @@ const ApprovalCard = ({
       )}
 
       {/* Expanded full payload */}
-      {isExpanded && item.full_payload && Object.keys(item.full_payload).length > 0 && (
-        <div className="mb-3 p-2.5 rounded-lg bg-secondary/50 border border-border">
-          <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
-            {typeof item.full_payload === 'string'
-              ? item.full_payload
-              : JSON.stringify(item.full_payload, null, 2)}
-          </pre>
+      {isExpanded && (
+        <div className="mb-3 space-y-2">
+          {/* Show content field first if available */}
+          {(item.full_payload as any)?.content && (
+            <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
+              <p className="text-xs text-foreground leading-relaxed whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {(item.full_payload as any).content}
+              </p>
+            </div>
+          )}
+          {/* Fall back to raw JSON if no content field */}
+          {!(item.full_payload as any)?.content && Object.keys(item.full_payload).length > 0 && (
+            <div className="p-2.5 rounded-lg bg-secondary/50 border border-border">
+              <pre className="text-[10px] text-muted-foreground whitespace-pre-wrap break-words leading-relaxed font-mono max-h-48 overflow-y-auto">
+                {JSON.stringify(item.full_payload, null, 2)}
+              </pre>
+            </div>
+          )}
         </div>
       )}
 
