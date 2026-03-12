@@ -90,13 +90,23 @@ async function loadRecentMemory(agentId: string, workspaceId: string | null): Pr
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
   
-  let url = `${baseUrl}/rest/v1/agent_memories?agent_role=eq.${agentId}&order=relevance_score.desc,created_at.desc&limit=10`;
+  let url = `${baseUrl}/rest/v1/ranked_memories?agent_role=eq.${agentId}&order=effective_importance.desc&limit=10&select=id,memory_text,memory_type,effective_importance`;
   if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
   
   const res = await fetch(url, { headers });
   if (!res.ok) return "";
   const memories = await res.json();
   if (!memories?.length) return "";
+
+  // Bump reference counts
+  const memoryIds = memories.map((m: any) => m.id).filter(Boolean);
+  if (memoryIds.length > 0) {
+    fetch(`${baseUrl}/rest/v1/rpc/bump_memory_references`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ memory_ids: memoryIds }),
+    }).catch(e => console.error("[memory-ref] bump failed:", e));
+  }
   
   return memories.map((m: any) => `- [${m.memory_type}] ${m.memory_text}`).join("\n");
 }
