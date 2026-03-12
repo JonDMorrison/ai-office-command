@@ -697,18 +697,19 @@ async function getTaskDepth(taskId: string): Promise<number> {
   return data?.[0]?.depth || 0;
 }
 
-async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
-  if (!workspaceId) return null;
+async function findSimilarActiveTask(workspaceId: string | null, title: string, assignedAgent?: string): Promise<any | null> {
+  if (!workspaceId && !assignedAgent) return null;
 
   const keywords = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
   if (keywords.length === 0) return null;
 
   const baseUrl = getSupabaseUrl();
   const headers = getSupabaseHeaders();
-  const res = await fetch(
-    `${baseUrl}/rest/v1/tasks?workspace_id=eq.${workspaceId}&status=in.(pending,queued,in_progress)&select=id,title,status&limit=20`,
-    { headers }
-  );
+  let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&select=id,title,status&limit=20`;
+  if (assignedAgent) url += `&assigned_agent=eq.${assignedAgent}`;
+  else if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+
+  const res = await fetch(url, { headers });
   if (!res.ok) return null;
   const tasks = await res.json();
 
