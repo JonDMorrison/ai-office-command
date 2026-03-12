@@ -528,7 +528,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
       result.status = "completed";
     }
 
-    // Log to agent_outputs
+    // Log to agent_outputs with model tracking
     await insertBatch("agent_outputs", [{
       workspace_id: workspaceId,
       agent_role: task.agent_role,
@@ -538,6 +538,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
       memories_created: memoryCount,
       insights_created: insightCount,
       parse_success: true,
+      conversation_id: `model:${AI_MODELS.reasoning.id}`,
     }]);
 
   } catch (e) {
