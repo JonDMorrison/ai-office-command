@@ -258,19 +258,30 @@ Never add an insight that describes what the product does.
 // ─── PARSE RESPONSE ─────────────────────────────────────────────────────────
 
 function parseAgentResponse(fullText: string): ParsedArtifacts {
+  // Try fenced JSON block first
   const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```\s*$/;
   const match = fullText.match(jsonBlockRegex);
-  
-  if (!match) {
-    return { message: fullText, output: fullText };
+
+  if (match) {
+    try {
+      return JSON.parse(match[1]) as ParsedArtifacts;
+    } catch {
+      return { message: fullText, output: fullText };
+    }
   }
-  
-  try {
-    const parsed = JSON.parse(match[1]);
-    return parsed as ParsedArtifacts;
-  } catch {
-    return { message: fullText, output: fullText };
+
+  // Try parsing entire response as raw JSON
+  const trimmed = fullText.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.message) return parsed as ParsedArtifacts;
+    } catch {
+      // fall through
+    }
   }
+
+  return { message: fullText, output: fullText };
 }
 
 // ─── EXECUTE SINGLE TASK ────────────────────────────────────────────────────

@@ -668,22 +668,39 @@ interface ArtifactCounts {
 }
 
 function extractArtifacts(fullText: string): { message: string; artifacts: ParsedArtifacts | null } {
+  // Try fenced JSON block first (```json ... ```)
   const jsonBlockRegex = /```json\s*\n([\s\S]*?)\n```\s*$/;
   const match = fullText.match(jsonBlockRegex);
 
-  if (!match) {
-    return { message: fullText, artifacts: null };
+  if (match) {
+    const message = fullText.slice(0, match.index).trim();
+    try {
+      const parsed = JSON.parse(match[1]);
+      console.log(`[artifacts] Parsed fenced JSON block with keys: ${Object.keys(parsed).join(", ")}`);
+      // If the JSON has a "message" field, prefer it over the prefix text
+      const chatMessage = parsed.message || message || fullText.slice(0, 200);
+      return { message: chatMessage, artifacts: parsed as ParsedArtifacts };
+    } catch (e) {
+      console.error("[artifacts] Failed to parse fenced JSON block:", e);
+      return { message: fullText, artifacts: null };
+    }
   }
 
-  const message = fullText.slice(0, match.index).trim();
-  try {
-    const parsed = JSON.parse(match[1]);
-    console.log(`[artifacts] Parsed JSON block with keys: ${Object.keys(parsed).join(", ")}`);
-    return { message, artifacts: parsed as ParsedArtifacts };
-  } catch (e) {
-    console.error("[artifacts] Failed to parse JSON block:", e);
-    return { message: fullText, artifacts: null };
+  // Try parsing the entire response as raw JSON
+  const trimmed = fullText.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed.message) {
+        console.log(`[artifacts] Parsed raw JSON response with keys: ${Object.keys(parsed).join(", ")}`);
+        return { message: parsed.message, artifacts: parsed as ParsedArtifacts };
+      }
+    } catch {
+      // Not valid JSON, fall through
+    }
   }
+
+  return { message: fullText, artifacts: null };
 }
 
 // ─── GUARDRAIL: Memory quality gate ─────────────────────────────────────────
