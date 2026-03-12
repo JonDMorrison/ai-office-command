@@ -71,6 +71,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
         approvals: data.approvalsCreated || 0,
         memories: data.memoriesCreated || 0,
         insights: data.insightsCreated || 0,
+        delegations: data.delegationsCreated || 0,
       };
       const hasArtifacts = Object.values(artifacts).some(v => v > 0);
       setMessages(prev => [
@@ -82,6 +83,7 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, initialNote }: ChatPanelProps
       const artifactParts: string[] = [];
       if (artifacts.tasks > 0) artifactParts.push(`${artifacts.tasks} task${artifacts.tasks > 1 ? 's' : ''} created`);
       if (artifacts.approvals > 0) artifactParts.push(`${artifacts.approvals} approval${artifacts.approvals > 1 ? 's' : ''} pending`);
+      if (artifacts.delegations > 0) artifactParts.push(`${artifacts.delegations} delegated`);
       if (artifacts.memories > 0) artifactParts.push(`${artifacts.memories} memor${artifacts.memories > 1 ? 'ies' : 'y'} saved`);
       if (artifacts.insights > 0) artifactParts.push(`${artifacts.insights} insight${artifacts.insights > 1 ? 's' : ''} logged`);
 
