@@ -66,7 +66,7 @@ export function useTasks() {
         task_type: task.task_type || 'general',
         source: task.source || 'standup',
         priority: task.priority || 3,
-        status: 'approved',
+        status: TASK_STATUS.QUEUED,
         input_payload: (task.input_payload || {}) as unknown as Record<string, unknown>,
       };
 
