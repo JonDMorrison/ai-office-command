@@ -140,6 +140,49 @@ async function insertBatch(table: string, rows: Record<string, unknown>[]): Prom
   return rows.length;
 }
 
+// ─── GUARDRAILS ─────────────────────────────────────────────────────────────
+
+const MEMORY_TRIGGER_PHRASES = [
+  "jon prefers", "jon wants", "jon decided", "jon always",
+  "jon never", "we agreed", "going forward", "jon said",
+  "jon likes", "jon dislikes", "jon chose", "the strategy is",
+];
+
+function shouldStoreMemory(memoryText: string): boolean {
+  const text = memoryText.toLowerCase();
+  const hasSignal = MEMORY_TRIGGER_PHRASES.some(p => text.includes(p));
+  const isGeneric = text.includes("likes clear") || text.includes("prefers good") || text.length < 20;
+  if (!hasSignal || isGeneric) console.log(`[memory-gate] REJECTED: "${memoryText.slice(0, 80)}"`);
+  return hasSignal && !isGeneric;
+}
+
+function parseInsight(raw: string | { insight_text: string; evidence?: string; signal_count?: number }): {
+  insight_text: string; evidence: string | null; signal_count: number;
+} {
+  if (typeof raw === "string") return { insight_text: raw, evidence: null, signal_count: 1 };
+  return { insight_text: raw.insight_text, evidence: raw.evidence || null, signal_count: raw.signal_count || 1 };
+}
+
+function shouldStoreInsight(parsed: { evidence: string | null; signal_count: number }): boolean {
+  if (!parsed.evidence || parsed.evidence.length < 5 || parsed.signal_count < 2) {
+    console.log(`[insight-gate] REJECTED (evidence=${!!parsed.evidence}, signal=${parsed.signal_count})`);
+    return false;
+  }
+  return true;
+}
+
+async function findSimilarActiveTask(workspaceId: string | null, title: string): Promise<any | null> {
+  const baseUrl = getSupabaseUrl();
+  const headers = getSupabaseHeaders();
+  let url = `${baseUrl}/rest/v1/tasks?status=in.(pending,queued,in_progress)&limit=20`;
+  if (workspaceId) url += `&workspace_id=eq.${workspaceId}`;
+  const res = await fetch(url, { headers });
+  if (!res.ok) return null;
+  const tasks = await res.json();
+  const words = title.toLowerCase().split(" ").filter((w: string) => w.length > 4);
+  return tasks?.find((t: any) => words.filter((word: string) => t.title.toLowerCase().includes(word)).length >= 2) || null;
+}
+
 // ─── EXECUTION PROMPT ───────────────────────────────────────────────────────
 
 function buildExecutionPrompt(
@@ -156,7 +199,7 @@ function buildExecutionPrompt(
 
   return `
 ## Identity
-You are the ${task.agent_role} agent for Jon Morrison${workspace ? `'s ${workspace.name} business` : ''}.
+You are the ${task.agent_role} agent for Jon Morrison${workspace ? \`'s ${workspace.name} business\` : ''}.
 Today is ${dateStr}.
 
 ## Workspace
@@ -183,22 +226,28 @@ If you cannot complete this task, explain exactly what is blocking you.
 ## Response Format
 Respond with a JSON block:
 
-\`\`\`json
+\\\`\\\`\\\`json
 {
   "message": "Summary of what you did",
   "output": "The actual deliverable content if applicable",
-  "suggested_tasks": [],
+  "suggested_tasks": [{ "title": "...", "urgency_score": 4, "impact_score": 5 }],
   "suggested_approvals": [],
-  "suggested_memories": [],
-  "insights": []
+  "suggested_memories": ["Jon prefers..."],
+  "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
 }
-\`\`\`
+\\\`\\\`\\\`
 
-Rules:
-- The JSON block must be the LAST thing in your response.
-- Tasks: verb-led, specific, actionable.
-- Approvals: REQUIRED for any outbound email, social post, or public content. Include the full draft in preview_text.
-- Memories: only for genuinely useful facts/preferences.
+## Memory Rules
+Only store memories that reference Jon's actual words or decisions.
+Must contain signal phrases like "Jon prefers", "Jon decided", "we agreed".
+
+## Insight Rules
+Only add insights with evidence and signal_count >= 2.
+Never add an insight that describes what the product does.
+
+## Task Scoring
+- urgency_score (1-5): Time sensitivity. 5 = today.
+- impact_score (1-5): Business impact. 5 = revenue/traction.
   `.trim();
 }
 
