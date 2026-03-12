@@ -15,6 +15,19 @@ interface HeaderBarProps {
 const HeaderBar = ({ activeCount, waitingCount, onStartStandup, pendingApprovals = 0, onOpenApprovals, onTasksRan }: HeaderBarProps) => {
   const [time, setTime] = useState(new Date());
   const [runningTasks, setRunningTasks] = useState(false);
+  const [readyToPostCount, setReadyToPostCount] = useState(0);
+
+  useEffect(() => {
+    const fetchCount = async () => {
+      const { count } = await (supabase
+        .from('approvals' as any)
+        .select('*', { count: 'exact', head: true }) as any)
+        .eq('status', 'approved')
+        .eq('approval_type', 'social_post');
+      setReadyToPostCount(count || 0);
+    };
+    fetchCount();
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000);
