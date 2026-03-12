@@ -24,6 +24,12 @@ const MEETING_POSITIONS = [
 interface DailyStandupProps {
   onApproved: (agentIds: string[], followUps: Record<string, string>) => void;
   onDismiss: () => void;
+  onCreateTask?: (task: {
+    agent_role: string;
+    title: string;
+    description?: string;
+    input_payload?: Record<string, unknown>;
+  }) => Promise<unknown>;
 }
 
 const DailyStandup = ({ onApproved, onDismiss }: DailyStandupProps) => {
