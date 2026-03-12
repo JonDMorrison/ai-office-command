@@ -38,6 +38,92 @@ export type Database = {
         }
         Relationships: []
       }
+      task_events: {
+        Row: {
+          created_at: string
+          event_payload: Json
+          event_type: string
+          id: string
+          task_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_payload?: Json
+          event_type: string
+          id?: string
+          task_id: string
+        }
+        Update: {
+          created_at?: string
+          event_payload?: Json
+          event_type?: string
+          id?: string
+          task_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_events_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tasks: {
+        Row: {
+          agent_role: string
+          company_id: string
+          completed_at: string | null
+          created_at: string
+          description: string | null
+          id: string
+          input_payload: Json
+          output_payload: Json
+          priority: number
+          requires_approval: boolean
+          source: string
+          status: string
+          task_type: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agent_role: string
+          company_id: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          input_payload?: Json
+          output_payload?: Json
+          priority?: number
+          requires_approval?: boolean
+          source?: string
+          status?: string
+          task_type?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agent_role?: string
+          company_id?: string
+          completed_at?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          input_payload?: Json
+          output_payload?: Json
+          priority?: number
+          requires_approval?: boolean
+          source?: string
+          status?: string
+          task_type?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
