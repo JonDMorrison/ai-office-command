@@ -979,15 +979,7 @@ serve(async (req) => {
 
   try {
     const { messages, agentId } = await req.json();
-    console.log(`[agent-chat] Request for agent: ${agentId}`);
-
-    const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!ANTHROPIC_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "ANTHROPIC_API_KEY is not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    console.log(`[agent-chat] Request for agent: ${agentId} | Using REASONING model (Claude)`);
 
     const GITHUB_TOKEN = Deno.env.get("GITHUB_TOKEN");
     if (!GITHUB_TOKEN) {
@@ -1025,33 +1017,14 @@ serve(async (req) => {
 
     console.log(`[agent-chat] System prompt: ${systemPrompt.length} chars`);
 
-    // Call Anthropic
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": ANTHROPIC_API_KEY,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages,
-      }),
-    });
+    // Call Claude via AI Router (reasoning model — all agent conversations use Claude)
+    const aiResult = await runReasoningModelConversation(
+      systemPrompt,
+      messages,
+      { agentRole: agentId, workspaceId, maxTokens: 4096 },
+    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[agent-chat] Anthropic API error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: `Anthropic API error: ${response.status}` }),
-        { status: response.status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const data = await response.json();
-    const fullText = data.content?.[0]?.text || "No response generated.";
+    const fullText = aiResult.text || "No response generated.";
 
     // Parse and process artifacts
     const { message: chatMessage, artifacts } = extractArtifacts(fullText);
