@@ -88,10 +88,10 @@ const ReadyToPost = () => {
   };
 
   const handleDownloadImage = (postId: string, agentRole: string) => {
-    const base64 = generatedImages[postId];
-    if (!base64) return;
+    const imageUrl = generatedImages[postId];
+    if (!imageUrl) return;
     const link = document.createElement('a');
-    link.href = `data:image/png;base64,${base64}`;
+    link.href = imageUrl;
     link.download = `${agentRole}-post-image.png`;
     link.click();
   };
