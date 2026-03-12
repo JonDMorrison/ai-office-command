@@ -99,18 +99,18 @@ export function useTasks() {
       const updates: Record<string, unknown> = { status };
       if (status === 'completed') updates.completed_at = new Date().toISOString();
 
-      const { error } = await supabase
+      const { error } = await (supabase
         .from('tasks')
-        .update(updates)
-        .eq('id', taskId);
+        .update(updates as any)
+        .eq('id', taskId));
 
       if (error) throw error;
 
-      await supabase.from('task_events').insert({
+      await (supabase.from('task_events').insert({
         task_id: taskId,
         event_type: 'status_changed',
         event_payload: { new_status: status },
-      });
+      } as any));
 
       setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status, ...(status === 'completed' ? { completed_at: new Date().toISOString() } : {}) } : t));
     } catch (err) {
