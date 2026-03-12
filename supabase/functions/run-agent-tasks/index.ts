@@ -343,39 +343,21 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
       loadRecentMemory(task.agent_role, task.workspace_id),
     ]);
 
-    // Build prompt and call Claude
+    // Build prompt and call Claude via AI Router (reasoning model)
     const systemPrompt = buildExecutionPrompt(task, workspace, skills, recentMemory);
 
-    // Call Lovable AI Gateway
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    console.log(`[run-tasks] Using REASONING model (Claude) for task execution: ${task.title}`);
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Execute this task: ${task.title}\n\n${task.description || ''}` },
-        ],
-      }),
+    const aiResult = await runReasoningModel({
+      systemPrompt,
+      userMessage: `Execute this task: ${task.title}\n\n${task.description || ''}`,
+      agentRole: task.agent_role,
+      workspaceId: task.workspace_id,
+      taskId: task.id,
+      callPurpose: "task_execution",
     });
 
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[run-tasks] AI Gateway error for task ${task.id}: ${response.status} ${errText}`);
-      await updateTaskStatus(task.id, "failed", `AI Gateway error: ${response.status}`);
-      result.status = "failed";
-      result.message = `AI Gateway error: ${response.status}`;
-      return result;
-    }
-
-    const data = await response.json();
-    const fullText = data.choices?.[0]?.message?.content || "";
+    const fullText = aiResult.text;
     const parsed = parseAgentResponse(fullText);
     
     result.message = parsed.message || fullText.slice(0, 200);
