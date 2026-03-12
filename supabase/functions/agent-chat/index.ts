@@ -399,10 +399,11 @@ serve(async (req) => {
       );
     }
 
-    // Load skills, tasks, and inbox context in parallel
-    const [skillContent, activeTasks, inboxContext] = await Promise.all([
+    // Load skills, tasks, approvals, and inbox context in parallel
+    const [skillContent, activeTasks, pendingApprovals, inboxContext] = await Promise.all([
       loadSkillModules(agentId, GITHUB_TOKEN),
       loadActiveTasks(agentId),
+      loadPendingApprovals(agentId),
       (agentId === "bloomsuite")
         ? buildBloomsuiteInboxContext().catch(e => {
             console.error("[inbox-ctx] BloomSuite error:", e);
@@ -422,6 +423,7 @@ serve(async (req) => {
       skillContent,
       inboxContext: inboxContext || undefined,
       activeTasks,
+      pendingApprovals,
     });
 
     console.log(`[agent-chat] System prompt assembled: ${systemPrompt.length} chars`);
