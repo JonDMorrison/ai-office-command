@@ -473,7 +473,7 @@ async function executeTask(task: Task, workspace: Workspace | null, githubToken:
         continue;
       }
       const targetWorkspace = AGENT_WORKSPACE[targetAgent] || null;
-      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "");
+      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "", targetAgent);
       if (similar) {
         console.log(`[delegation-dedup] Skipping "${d.title}" → ${targetAgent}`);
         continue;

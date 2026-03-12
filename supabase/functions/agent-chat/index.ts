@@ -896,7 +896,7 @@ async function processAgentArtifacts(
       const targetWorkspace = getWorkspaceForAgent(targetAgent);
 
       // Collision detection in target workspace
-      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "");
+      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "", targetAgent);
       if (similar) {
         console.log(`[delegation-dedup] Skipping "${delegation.title}" → ${targetAgent} — similar to "${similar.title}"`);
         await fetch(`${baseUrl}/rest/v1/task_events`, {
