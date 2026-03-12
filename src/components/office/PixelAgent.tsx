@@ -276,7 +276,7 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         </div>
         {showTaskText && (
           <div className="mt-1 truncate" style={{ fontSize: '10px', fontWeight: 400, color: '#555', textAlign: 'center' }}>
-            {agent.tasks[taskIndex]}
+            {activeTaskTitle || agent.tasks[taskIndex]}
           </div>
         )}
         <div
