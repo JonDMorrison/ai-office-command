@@ -472,6 +472,10 @@ export type Database = {
       }
     }
     Functions: {
+      bump_memory_references: {
+        Args: { memory_ids: string[] }
+        Returns: undefined
+      }
       memory_effective_importance: {
         Args: {
           p_created_at: string
