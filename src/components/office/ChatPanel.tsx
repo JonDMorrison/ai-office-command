@@ -9,6 +9,7 @@ interface ChatPanelProps {
   agent: Agent;
   onClose: () => void;
   onOpenSkills: () => void;
+  onOpenApprovals?: () => void;
   initialNote?: string;
 }
 
