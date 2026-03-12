@@ -851,8 +851,68 @@ async function processAgentArtifacts(
     }
   }
 
-  console.log(`[artifacts] Created: ${tasksCreated} tasks, ${approvalsCreated} approvals, ${memoriesCreated} memories, ${insightsCreated} insights`);
-  return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated };
+  // --- DELEGATIONS: create tasks in another agent's workspace ---
+  if (parsed.delegate_to?.length) {
+    const validAgents = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
+    for (const delegation of parsed.delegate_to) {
+      const targetAgent = delegation.agent_role;
+      if (!targetAgent || targetAgent === agentId) {
+        console.log(`[delegation] Rejected self-delegation or missing agent_role: "${delegation.title}"`);
+        continue;
+      }
+      if (!validAgents.includes(targetAgent)) {
+        console.log(`[delegation] Rejected unknown agent_role "${targetAgent}": "${delegation.title}"`);
+        continue;
+      }
+
+      const targetWorkspace = getWorkspaceForAgent(targetAgent);
+
+      // Collision detection in target workspace
+      const similar = await findSimilarActiveTask(targetWorkspace, delegation.title || "");
+      if (similar) {
+        console.log(`[delegation-dedup] Skipping "${delegation.title}" → ${targetAgent} — similar to "${similar.title}"`);
+        await fetch(`${baseUrl}/rest/v1/task_events`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            task_id: similar.id,
+            event_type: "agent_note",
+            event_payload: { note: `Delegated from ${agentId}: "${delegation.title}"` },
+          }),
+        });
+        continue;
+      }
+
+      const res = await fetch(`${baseUrl}/rest/v1/tasks`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          workspace_id: targetWorkspace,
+          agent_role: targetAgent,
+          title: (delegation.title || "Delegated task").slice(0, 120),
+          description: delegation.description || `Delegated from ${agentId}`,
+          status: "pending",
+          priority: delegation.priority || 2,
+          urgency_score: delegation.urgency_score || 3,
+          impact_score: delegation.impact_score || 3,
+          depth: 0,
+          created_by: "agent",
+          source: "delegation",
+          input_payload: { delegated_from: agentId, original_workspace: workspaceId },
+        }),
+      });
+
+      if (res.ok) {
+        delegationsCreated++;
+        console.log(`[delegation] ${agentId} → ${targetAgent}: "${delegation.title}"`);
+      } else {
+        console.error("[delegation-insert]", res.status, await res.text());
+      }
+    }
+  }
+
+  console.log(`[artifacts] Created: ${tasksCreated} tasks, ${approvalsCreated} approvals, ${memoriesCreated} memories, ${insightsCreated} insights, ${delegationsCreated} delegations`);
+  return { tasksCreated, approvalsCreated, memoriesCreated, insightsCreated, delegationsCreated };
 }
 
 async function logAgentOutput(agentId: string, workspaceId: string | null, message: string, counts: { tasksCreated: number; approvalsCreated: number; memoriesCreated: number; insightsCreated: number }, parseSuccess: boolean) {
