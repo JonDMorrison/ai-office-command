@@ -263,7 +263,7 @@ Respond with a JSON block:
   "message": "Summary of what you did",
   "output": "The actual deliverable content if applicable",
   "suggested_tasks": [{ "title": "...", "urgency_score": 4, "impact_score": 5 }],
-  "suggested_approvals": [],
+  "suggested_approvals": [{ "approval_type": "email_draft|social_post|blog_post|ad_copy|general", "title": "Clear descriptive title of the deliverable", "preview_text": "A short summary of what this is and why it matters", "content": "The FULL deliverable text — the actual email body, social post, blog draft, etc." }],
   "delegate_to": [{ "agent_role": "bloomsuite", "title": "...", "description": "...", "urgency_score": 3, "impact_score": 4 }],
   "suggested_memories": ["Jon prefers..."],
   "insights": [{ "insight_text": "...", "evidence": "...", "signal_count": 3 }]
