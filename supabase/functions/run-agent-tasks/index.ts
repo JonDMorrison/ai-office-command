@@ -318,7 +318,7 @@ function parseAgentResponse(fullText: string): ParsedArtifacts {
 
 // ─── EXECUTE SINGLE TASK ────────────────────────────────────────────────────
 
-async function executeTask(task: Task, workspace: Workspace | null, apiKey: string, githubToken: string, tasksCreatedSoFar: number = 0): Promise<{
+async function executeTask(task: Task, workspace: Workspace | null, githubToken: string, tasksCreatedSoFar: number = 0): Promise<{
   taskId: string;
   status: string;
   message: string;
