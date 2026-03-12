@@ -4,6 +4,8 @@ interface HeaderBarProps {
   activeCount: number;
   waitingCount: number;
   onStartStandup?: () => void;
+  pendingApprovals?: number;
+  onOpenApprovals?: () => void;
 }
 
 const HeaderBar = ({ activeCount, waitingCount, onStartStandup }: HeaderBarProps) => {
