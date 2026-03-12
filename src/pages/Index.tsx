@@ -34,6 +34,7 @@ const Index = () => {
   const handleAgentClick = (agentId: string) => {
     setSelectedAgentId(prev => (prev === agentId ? null : agentId));
     if (showApprovals) setShowApprovals(false);
+    if (showActivity) setShowActivity(false);
   };
 
   const handleStandupApproved = useCallback((approvedIds: string[], followUps: Record<string, string>) => {
