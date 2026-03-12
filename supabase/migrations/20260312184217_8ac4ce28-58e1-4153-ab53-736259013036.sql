@@ -1,0 +1,1 @@
+ALTER TABLE public.approvals ADD COLUMN IF NOT EXISTS image_url text NULL;

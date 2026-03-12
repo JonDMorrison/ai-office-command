@@ -91,7 +91,7 @@ const ReadyToPost = () => {
       const prompt = getPromptForPost(post);
 
       const { data, error } = await supabase.functions.invoke('generate-post-image', {
-        body: { postText: prompt },
+        body: { postText: prompt, approvalId: post.id },
       });
 
       if (error) throw new Error(error.message || 'Edge function error');

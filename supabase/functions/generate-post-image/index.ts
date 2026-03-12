@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,13 +10,12 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { postText } = await req.json();
+    const { postText, approvalId } = await req.json();
     if (!postText) throw new Error("postText is required");
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    // Use the prompt directly — the client now sends a fully-formed template prompt
     const imagePrompt = postText;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -52,14 +52,57 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const base64Url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!base64Url) {
       console.error("No image in response:", JSON.stringify(data).slice(0, 500));
       throw new Error("No image returned from AI");
     }
 
-    return new Response(JSON.stringify({ imageUrl }), {
+    // Upload to Storage if we have an approvalId
+    let publicUrl = base64Url;
+
+    if (approvalId) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      // Extract base64 data from data URL
+      const base64Data = base64Url.replace(/^data:image\/\w+;base64,/, "");
+      const binaryData = Uint8Array.from(atob(base64Data), (c) => c.charCodeAt(0));
+
+      const fileName = `${approvalId}-${Date.now()}.png`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("post-images")
+        .upload(fileName, binaryData, {
+          contentType: "image/png",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.error("Storage upload error:", uploadError);
+        throw new Error("Failed to upload image to storage");
+      }
+
+      const { data: urlData } = supabase.storage
+        .from("post-images")
+        .getPublicUrl(fileName);
+
+      publicUrl = urlData.publicUrl;
+
+      // Save URL back to the approvals row
+      const { error: updateError } = await supabase
+        .from("approvals")
+        .update({ image_url: publicUrl })
+        .eq("id", approvalId);
+
+      if (updateError) {
+        console.error("Failed to update approval with image_url:", updateError);
+      }
+    }
+
+    return new Response(JSON.stringify({ imageUrl: publicUrl }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
