@@ -329,9 +329,9 @@ Respond in valid JSON using this exact structure:
   "suggested_approvals": [
     {
       "approval_type": "social_post | email_draft | blog_post | ad_copy",
-      "title": "Short label",
-      "preview_text": "First 150 chars of content",
-      "full_payload": {}
+      "title": "Clear descriptive title of the deliverable",
+      "preview_text": "Short summary of what this is and why",
+      "content": "The FULL deliverable text that Jon will review — the actual email body, social post, blog draft, etc."
     }
   ],
   "delegate_to": [
