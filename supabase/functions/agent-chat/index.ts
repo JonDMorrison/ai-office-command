@@ -207,6 +207,21 @@ async function buildSystemPrompt(
   const recentMemories: any[] = memoriesRes.ok ? await memoriesRes.json() : [];
   const pendingApprovals: any[] = approvalsRes.ok ? await approvalsRes.json() : [];
 
+  // Bump reference_count and last_referenced_at for loaded memories
+  if (recentMemories.length > 0) {
+    const memoryIds = recentMemories.map((m: any) => m.id).filter(Boolean);
+    if (memoryIds.length > 0) {
+      fetch(`${baseUrl}/rest/v1/agent_memories?id=in.(${memoryIds.join(",")})`, {
+        method: "PATCH",
+        headers: { ...headers, Prefer: "return=minimal" },
+        body: JSON.stringify({
+          last_referenced_at: new Date().toISOString(),
+          reference_count: recentMemories[0]?.reference_count ? undefined : 1, // fallback
+        }),
+      }).catch(e => console.error("[memory-ref] Failed to bump references:", e));
+    }
+  }
+
   const agentNames: Record<string, string> = {
     bloomsuite: "BloomSuite Agent",
     clinicleader: "ClinicLeader Agent",
