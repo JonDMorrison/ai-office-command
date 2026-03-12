@@ -35,9 +35,9 @@ function getWorkspaceForAgent(agentId: string): string | null {
 // ─── SKILL MAPPING ──────────────────────────────────────────────────────────
 const AGENT_SKILLS: Record<string, string[]> = {
   bloomsuite: ["joncoach-core", "bloomsuite-agent", "bloomsuite-copywriting", "bloomsuite-seo", "bloomsuite-seo-advisor", "brainstorming", "frontend-design", "human-voice-writing"],
-  clinicleader: ["joncoach-core", "clinicleader-agent", "internal-comms", "brainstorming", "human-voice-writing"],
+  clinicleader: ["joncoach-core", "clinicleader-agent", "clinicleader-data", "internal-comms", "brainstorming", "human-voice-writing"],
   projectpath: ["joncoach-core", "projectpath-agent", "supabase-best-practices", "nextjs-best-practices", "human-voice-writing"],
-  disc: ["joncoach-core", "disc-agent", "frontend-design", "supabase-best-practices", "human-voice-writing"],
+  disc: ["joncoach-core", "disc-agent", "disc-report-writer", "frontend-design", "supabase-best-practices", "human-voice-writing"],
   inbox: ["joncoach-core", "inbox-agent", "internal-comms", "human-voice-writing"],
   executive: ["joncoach-core"],
 };
