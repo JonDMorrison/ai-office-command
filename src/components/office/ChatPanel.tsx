@@ -165,9 +165,12 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote 
                   </span>
                 )}
                 {msg.artifacts.approvals > 0 && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
+                  <button
+                    onClick={onOpenApprovals}
+                    className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground hover:bg-accent/80 transition-colors cursor-pointer"
+                  >
                     ✋ {msg.artifacts.approvals} approval{msg.artifacts.approvals > 1 ? 's' : ''}
-                  </span>
+                  </button>
                 )}
                 {msg.artifacts.delegations > 0 && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-accent text-accent-foreground">
