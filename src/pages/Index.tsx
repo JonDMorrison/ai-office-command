@@ -50,12 +50,12 @@ const Index = () => {
 
   // Desk positions: U-shape layout
   const deskPositions = [
-    { top: '8%', left: '12%' },
-    { top: '8%', left: '50%', transform: 'translateX(-50%)' },
-    { top: '8%', right: '12%' },
-    { top: '52%', left: '15%' },
-    { top: '52%', left: '50%', transform: 'translateX(-50%)' },
-    { top: '52%', right: '15%' },
+    { top: '6%', left: '8%' },
+    { top: '6%', left: '50%', transform: 'translateX(-50%)' },
+    { top: '6%', right: '8%' },
+    { top: '50%', left: '10%' },
+    { top: '50%', left: '50%', transform: 'translateX(-50%)' },
+    { top: '50%', right: '10%' },
   ];
 
   return (
