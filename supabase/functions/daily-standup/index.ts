@@ -171,19 +171,11 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY is not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     const today = new Date().toLocaleDateString("en-US", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
     });
 
-    console.log(`[daily-standup] Started: ${today}`);
+    console.log(`[daily-standup] Started: ${today} | Using REASONING model (Claude)`);
 
     // Fetch DB context and Gmail in parallel
     const bloomsuiteToken = Deno.env.get("GMAIL_REFRESH_TOKEN_BLOOMSUITE") || "";
@@ -233,48 +225,20 @@ serve(async (req) => {
       return parts.join("\n");
     }).join("\n\n");
 
-    console.log(`[daily-standup] Context loaded. Calling executive agent...`);
+    console.log(`[daily-standup] Context loaded. Calling reasoning model (Claude)...`);
 
-    // Call Lovable AI with executive prompt
+    // Call Claude via AI Router (executive standup = reasoning task)
     const systemPrompt = buildExecutivePrompt(today, contextStr, inboxSummary);
 
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: "Run the daily standup. Give me your executive briefing and today's prioritized actions." },
-        ],
-      }),
+    const aiResult = await runReasoningModel({
+      systemPrompt,
+      userMessage: "Run the daily standup. Give me your executive briefing and today's prioritized actions.",
+      agentRole: "executive",
+      workspaceId: null,
+      callPurpose: "daily_standup_synthesis",
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error(`[daily-standup] AI error: ${aiResponse.status} ${errText}`);
-
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limited — try again in a moment." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted — add credits in Settings." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      return new Response(JSON.stringify({ error: "AI gateway error" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const aiData = await aiResponse.json();
-    const rawText = aiData.choices?.[0]?.message?.content || "";
+    const rawText = aiResult.text;
 
     // Parse executive response
     let parsed: any = {};

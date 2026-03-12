@@ -963,6 +963,7 @@ async function logAgentOutput(agentId: string, workspaceId: string | null, messa
         memories_created: counts.memoriesCreated,
         insights_created: counts.insightsCreated,
         parse_success: parseSuccess,
+        conversation_id: `model:${AI_MODELS.reasoning.id}`,
       }),
     });
   } catch (e) {
