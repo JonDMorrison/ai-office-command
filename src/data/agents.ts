@@ -24,6 +24,7 @@ export const agents: Agent[] = [
     name: 'BloomSuite',
     role: 'Garden Center Marketing & SaaS',
     product: 'BloomSuite',
+    workspaceId: 'bloomsuite',
     colorVar: 'agent-bloom',
     colorHex: '#22c55e',
     avatar: '🌿',
