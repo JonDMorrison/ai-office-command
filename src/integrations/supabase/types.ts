@@ -19,8 +19,10 @@ export type Database = {
           agent_role: string
           category: string
           created_at: string
+          evidence: string | null
           id: string
           insight_text: string
+          signal_count: number | null
           source_task_id: string | null
           workspace_id: string
         }
@@ -28,8 +30,10 @@ export type Database = {
           agent_role: string
           category?: string
           created_at?: string
+          evidence?: string | null
           id?: string
           insight_text: string
+          signal_count?: number | null
           source_task_id?: string | null
           workspace_id: string
         }
@@ -37,8 +41,10 @@ export type Database = {
           agent_role?: string
           category?: string
           created_at?: string
+          evidence?: string | null
           id?: string
           insight_text?: string
+          signal_count?: number | null
           source_task_id?: string | null
           workspace_id?: string
         }
@@ -55,6 +61,7 @@ export type Database = {
       agent_memories: {
         Row: {
           agent_role: string
+          confidence: string | null
           created_at: string
           expires_at: string | null
           id: string
@@ -69,6 +76,7 @@ export type Database = {
         }
         Insert: {
           agent_role: string
+          confidence?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -83,6 +91,7 @@ export type Database = {
         }
         Update: {
           agent_role?: string
+          confidence?: string | null
           created_at?: string
           expires_at?: string | null
           id?: string
@@ -294,10 +303,15 @@ export type Database = {
           agent_role: string
           completed_at: string | null
           created_at: string
+          created_by: string | null
+          depth: number | null
           description: string | null
+          execution_priority: number | null
           id: string
+          impact_score: number | null
           input_payload: Json
           output_payload: Json
+          parent_task_id: string | null
           priority: number
           requires_approval: boolean
           source: string
@@ -305,16 +319,22 @@ export type Database = {
           task_type: string
           title: string
           updated_at: string
+          urgency_score: number | null
           workspace_id: string | null
         }
         Insert: {
           agent_role: string
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
+          depth?: number | null
           description?: string | null
+          execution_priority?: number | null
           id?: string
+          impact_score?: number | null
           input_payload?: Json
           output_payload?: Json
+          parent_task_id?: string | null
           priority?: number
           requires_approval?: boolean
           source?: string
@@ -322,16 +342,22 @@ export type Database = {
           task_type?: string
           title: string
           updated_at?: string
+          urgency_score?: number | null
           workspace_id?: string | null
         }
         Update: {
           agent_role?: string
           completed_at?: string | null
           created_at?: string
+          created_by?: string | null
+          depth?: number | null
           description?: string | null
+          execution_priority?: number | null
           id?: string
+          impact_score?: number | null
           input_payload?: Json
           output_payload?: Json
+          parent_task_id?: string | null
           priority?: number
           requires_approval?: boolean
           source?: string
@@ -339,9 +365,18 @@ export type Database = {
           task_type?: string
           title?: string
           updated_at?: string
+          urgency_score?: number | null
           workspace_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "tasks_parent_task_id_fkey"
+            columns: ["parent_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       workspaces: {
         Row: {
