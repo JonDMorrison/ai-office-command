@@ -5,6 +5,10 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── SAFETY LIMITS ──────────────────────────────────────────────────────────
+const MAX_TASKS_PER_RUN = 10;
+const MAX_SUBTASKS_PER_PARENT = 5;
+
 // ─── SKILL MAPPING ──────────────────────────────────────────────────────────
 const AGENT_SKILLS: Record<string, string[]> = {
   bloomsuite: ["joncoach-core", "bloomsuite-agent", "bloomsuite-copywriting", "brainstorming", "frontend-design"],
@@ -286,7 +290,7 @@ function parseAgentResponse(fullText: string): ParsedArtifacts {
 
 // ─── EXECUTE SINGLE TASK ────────────────────────────────────────────────────
 
-async function executeTask(task: Task, workspace: Workspace | null, apiKey: string, githubToken: string): Promise<{
+async function executeTask(task: Task, workspace: Workspace | null, apiKey: string, githubToken: string, tasksCreatedSoFar: number = 0): Promise<{
   taskId: string;
   status: string;
   message: string;
@@ -346,9 +350,20 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
     const workspaceId = task.workspace_id;
     const parentDepth = task.depth || 0;
 
-    // --- TASKS: depth limit + deduplication ---
+    // --- TASKS: depth limit + deduplication + run/parent caps ---
     const taskRows: Record<string, unknown>[] = [];
+    let subtasksForThisParent = 0;
     for (const t of parsed.suggested_tasks || []) {
+      // Cap: max tasks created across entire run
+      if (tasksCreatedSoFar + taskRows.length >= MAX_TASKS_PER_RUN) {
+        console.log(`[run-cap] MAX_TASKS_PER_RUN (${MAX_TASKS_PER_RUN}) reached, skipping: "${t.title}"`);
+        break;
+      }
+      // Cap: max subtasks per parent task
+      if (subtasksForThisParent >= MAX_SUBTASKS_PER_PARENT) {
+        console.log(`[parent-cap] MAX_SUBTASKS_PER_PARENT (${MAX_SUBTASKS_PER_PARENT}) reached for "${task.title}", skipping: "${t.title}"`);
+        break;
+      }
       if (parentDepth >= 3) {
         console.log(`[depth-limit] Skipping child task at depth ${parentDepth + 1}: "${t.title}"`);
         await insertBatch("agent_insights", [{
@@ -384,6 +399,7 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
           depth: parentDepth + 1,
           created_by: "agent",
         });
+        subtasksForThisParent++;
       }
     }
 
@@ -536,11 +552,13 @@ serve(async (req) => {
 
     // 3. Execute tasks sequentially (to stay within edge function time limits)
     const results = [];
+    let totalTasksCreatedThisRun = 0;
     for (const task of queuedTasks) {
       const workspace = task.workspace_id ? workspaceMap.get(task.workspace_id) || null : null;
-      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN);
+      const result = await executeTask(task, workspace, ANTHROPIC_API_KEY, GITHUB_TOKEN, totalTasksCreatedThisRun);
+      totalTasksCreatedThisRun += result.artifactCounts.tasks;
       results.push(result);
-      console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status}`);
+      console.log(`[run-tasks] Task ${task.id} (${task.title}): ${result.status} | Total tasks created this run: ${totalTasksCreatedThisRun}`);
     }
 
     return new Response(
