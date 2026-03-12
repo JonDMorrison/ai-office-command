@@ -81,7 +81,7 @@ Format (only include arrays that have items):
     { "title": "Verb-led title ≤120 chars", "description": "Detail", "task_type": "content_draft|research|analysis|outreach|technical|general", "urgency_score": 4, "impact_score": 5 }
   ],
   "suggested_approvals": [
-    { "approval_type": "social_post|email_draft|public_content", "title": "What Jon sees", "preview_text": "The full draft content", "platform": "linkedin" }
+    { "approval_type": "social_post|email_draft|public_content", "title": "Clear descriptive title of the deliverable", "preview_text": "A short summary of what this is", "content": "The FULL text of the email/post/draft — this is what Jon will review", "platform": "linkedin" }
   ],
   "suggested_memories": [
     "Jon prefers short punchy LinkedIn posts without emojis"
