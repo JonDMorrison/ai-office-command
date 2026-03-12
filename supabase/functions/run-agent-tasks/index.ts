@@ -41,10 +41,10 @@ interface Workspace {
 interface ParsedArtifacts {
   message?: string;
   output?: string;
-  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number }>;
+  suggested_tasks?: Array<{ title: string; description?: string; task_type?: string; priority?: number; urgency_score?: number; impact_score?: number }>;
   suggested_approvals?: Array<{ approval_type: string; title: string; preview_text?: string; platform?: string }>;
   suggested_memories?: string[];
-  insights?: string[];
+  insights?: Array<string | { insight_text: string; evidence?: string; signal_count?: number }>;
 }
 
 // ─── HELPERS ────────────────────────────────────────────────────────────────
