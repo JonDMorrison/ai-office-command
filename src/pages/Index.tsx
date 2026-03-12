@@ -18,7 +18,7 @@ const Index = () => {
   const [standupActive, setStandupActive] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
-  const { states, activeCount, waitingCount, setStandupOverrides } = useAgentStates();
+  const { states, activeCount, waitingCount, setStandupOverrides, refetch: refetchAgentStates } = useAgentStates();
   const { tasks, fetchTasks, createTask } = useTasks();
   const { pendingCount, fetchApprovals } = useApprovals();
   const followUpNotes = useRef<Record<string, string>>({});
