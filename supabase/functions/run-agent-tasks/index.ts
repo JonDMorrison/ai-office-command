@@ -445,7 +445,38 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
         category: "general",
       }));
 
-    const [taskCount, approvalCount, memoryCount, insightCount] = await Promise.all([
+    // --- DELEGATIONS: cross-agent task creation ---
+    const delegationRows: Record<string, unknown>[] = [];
+    const validAgents = ["bloomsuite", "clinicleader", "projectpath", "disc", "inbox", "executive"];
+    for (const d of parsed.delegate_to || []) {
+      const targetAgent = d.agent_role;
+      if (!targetAgent || targetAgent === task.agent_role || !validAgents.includes(targetAgent)) {
+        console.log(`[delegation] Rejected: "${d.title}" → ${targetAgent || "none"}`);
+        continue;
+      }
+      const targetWorkspace = AGENT_WORKSPACE[targetAgent] || null;
+      const similar = await findSimilarActiveTask(targetWorkspace, d.title || "");
+      if (similar) {
+        console.log(`[delegation-dedup] Skipping "${d.title}" → ${targetAgent}`);
+        continue;
+      }
+      delegationRows.push({
+        workspace_id: targetWorkspace,
+        agent_role: targetAgent,
+        title: (d.title || "Delegated task").slice(0, 120),
+        description: d.description || `Delegated from ${task.agent_role}`,
+        status: "pending",
+        priority: d.priority || 2,
+        urgency_score: d.urgency_score || 3,
+        impact_score: d.impact_score || 3,
+        depth: 0,
+        created_by: "agent",
+        source: "delegation",
+        input_payload: { delegated_from: task.agent_role, parent_task_id: task.id },
+      });
+    }
+
+    const [taskCount, approvalCount, memoryCount, insightCount, delegationCount] = await Promise.all([
       insertBatch("tasks", taskRows),
       insertBatch("approvals", (parsed.suggested_approvals || []).map(a => ({
         workspace_id: workspaceId,
@@ -458,9 +489,10 @@ async function executeTask(task: Task, workspace: Workspace | null, apiKey: stri
       }))),
       insertBatch("agent_memories", memoryRows),
       insertBatch("agent_insights", insightRows),
+      insertBatch("tasks", delegationRows),
     ]);
 
-    result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount };
+    result.artifactCounts = { tasks: taskCount, approvals: approvalCount, memories: memoryCount, insights: insightCount, delegations: delegationCount };
 
     // Determine final status
     if (approvalCount > 0) {
