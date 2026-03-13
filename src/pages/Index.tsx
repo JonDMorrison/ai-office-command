@@ -6,7 +6,7 @@ import { useApprovals } from '@/hooks/useApprovals';
 import { TASK_STATUS } from '@/lib/constants';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
-import ChatPanel from '@/components/office/ChatPanel';
+import ChatPanel, { Message } from '@/components/office/ChatPanel';
 import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
@@ -16,6 +16,7 @@ import OperationsRail from '@/components/office/OperationsRail';
 
 const Index = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const conversationsRef = useRef<Record<string, Message[]>>({});
   const [showSkills, setShowSkills] = useState(false);
   const [standupActive, setStandupActive] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
