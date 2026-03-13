@@ -29,21 +29,21 @@ export interface AgentDynamicState {
  */
 function deriveState(
   agentId: string,
-  tasksByAgent: Record<string, Array<{ status: string; title: string }>>,
+  tasksByAgent: Record<string, Array<{ status: string; title: string; id: string; description: string | null }>>,
   pendingApprovalAgents: Set<string>,
-): { state: DynamicState; activeTaskTitle?: string } {
+): { state: DynamicState; activeTaskTitle?: string; activeTaskId?: string; activeTaskDescription?: string } {
   const tasks = tasksByAgent[agentId] || [];
 
   const blocked = tasks.find(t => t.status === TASK_STATUS.BLOCKED);
-  if (blocked) return { state: 'blocked', activeTaskTitle: blocked.title };
+  if (blocked) return { state: 'blocked', activeTaskTitle: blocked.title, activeTaskId: blocked.id, activeTaskDescription: blocked.description ?? undefined };
 
   const needsInput = tasks.find(t => t.status === TASK_STATUS.WAITING_FOR_INPUT);
-  if (needsInput) return { state: 'needs_input', activeTaskTitle: needsInput.title };
+  if (needsInput) return { state: 'needs_input', activeTaskTitle: needsInput.title, activeTaskId: needsInput.id, activeTaskDescription: needsInput.description ?? undefined };
 
   if (pendingApprovalAgents.has(agentId)) return { state: 'waiting' };
 
   const working = tasks.find(t => t.status === TASK_STATUS.IN_PROGRESS || t.status === TASK_STATUS.QUEUED);
-  if (working) return { state: 'working', activeTaskTitle: working.title };
+  if (working) return { state: 'working', activeTaskTitle: working.title, activeTaskId: working.id, activeTaskDescription: working.description ?? undefined };
 
   return { state: 'idle' };
 }
