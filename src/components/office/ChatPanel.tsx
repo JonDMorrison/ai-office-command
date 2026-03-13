@@ -5,37 +5,40 @@ import { supabase } from '@/integrations/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import { toast } from '@/hooks/use-toast';
 
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  artifacts?: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
+}
+
 interface ChatPanelProps {
   agent: Agent;
   onClose: () => void;
   onOpenSkills: () => void;
   onOpenApprovals?: () => void;
   initialNote?: string;
+  messages: Message[];
+  onMessagesChange: (messages: Message[]) => void;
 }
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  artifacts?: { tasks: number; approvals: number; memories: number; insights: number; delegations: number };
-}
-
-const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote }: ChatPanelProps) => {
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const initial: Message[] = [];
-    if (initialNote) {
-      initial.push({
-        role: 'user',
-        content: `Before starting, note Jon's refinement: ${initialNote}`,
-      });
-    }
+export function buildInitialMessages(agent: Agent, initialNote?: string): Message[] {
+  const initial: Message[] = [];
+  if (initialNote) {
     initial.push({
-      role: 'assistant',
-      content: initialNote
-        ? `Got it — I'll factor in that refinement. I'm ${agent.name}, your ${agent.role} specialist. Let's get started!`
-        : `Hi! I'm ${agent.name}, your ${agent.role} specialist. How can I help you today?`,
+      role: 'user',
+      content: `Before starting, note Jon's refinement: ${initialNote}`,
     });
-    return initial;
+  }
+  initial.push({
+    role: 'assistant',
+    content: initialNote
+      ? `Got it — I'll factor in that refinement. I'm ${agent.name}, your ${agent.role} specialist. Let's get started!`
+      : `Hi! I'm ${agent.name}, your ${agent.role} specialist. How can I help you today?`,
   });
+  return initial;
+}
+
+const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, messages, onMessagesChange }: ChatPanelProps) => {
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -49,13 +52,12 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote 
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    const updated = [...messages, { role: 'user' as const, content: userMessage }];
+    onMessagesChange(updated);
     setIsTyping(true);
 
     try {
-      const conversationMessages = messages
-        .map(m => ({ role: m.role, content: m.content }));
-      conversationMessages.push({ role: 'user', content: userMessage });
+      const conversationMessages = updated.map(m => ({ role: m.role, content: m.content }));
 
       const { data, error } = await supabase.functions.invoke('agent-chat', {
         body: {
@@ -75,10 +77,11 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote 
         delegations: data.delegationsCreated || 0,
       };
       const hasArtifacts = Object.values(artifacts).some(v => v > 0);
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: data.message || data.text || 'No response.', artifacts: hasArtifacts ? artifacts : undefined },
-      ]);
+      const withReply = [
+        ...updated,
+        { role: 'assistant' as const, content: data.message || data.text || 'No response.', artifacts: hasArtifacts ? artifacts : undefined },
+      ];
+      onMessagesChange(withReply);
 
       // Show toast for created artifacts
       const artifactParts: string[] = [];
@@ -96,10 +99,11 @@ const ChatPanel = ({ agent, onClose, onOpenSkills, onOpenApprovals, initialNote 
       }
     } catch (err) {
       console.error('Chat error:', err);
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: 'Sorry, I had trouble connecting. Please try again.' },
-      ]);
+      const withError = [
+        ...updated,
+        { role: 'assistant' as const, content: 'Sorry, I had trouble connecting. Please try again.' },
+      ];
+      onMessagesChange(withError);
     } finally {
       setIsTyping(false);
     }

@@ -6,7 +6,7 @@ import { useApprovals } from '@/hooks/useApprovals';
 import { TASK_STATUS } from '@/lib/constants';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
-import ChatPanel, { Message } from '@/components/office/ChatPanel';
+import ChatPanel, { Message, buildInitialMessages } from '@/components/office/ChatPanel';
 import StatusBar from '@/components/office/StatusBar';
 import SkillsEditor from '@/components/office/SkillsEditor';
 import DailyStandup from '@/components/office/DailyStandup';
