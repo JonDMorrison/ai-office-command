@@ -13,6 +13,8 @@ export interface AgentDynamicState {
   blinkOn: boolean;
   standupOverride?: string;
   activeTaskTitle?: string;
+  activeTaskId?: string;
+  activeTaskDescription?: string;
 }
 
 /**
