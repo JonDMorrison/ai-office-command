@@ -4,6 +4,7 @@ import { useAgentStates } from '@/hooks/useAgentStates';
 import { useTasks } from '@/hooks/useTasks';
 import { useApprovals } from '@/hooks/useApprovals';
 import { TASK_STATUS } from '@/lib/constants';
+import { toast } from 'sonner';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel, { Message, buildInitialMessages } from '@/components/office/ChatPanel';
@@ -23,7 +24,7 @@ const Index = () => {
   const [showActivity, setShowActivity] = useState(false);
   const selectedAgent = agents.find(a => a.id === selectedAgentId);
   const { states, activeCount, waitingCount, setStandupOverrides, refetch: refetchAgentStates } = useAgentStates();
-  const { tasks, fetchTasks, createTask } = useTasks();
+  const { tasks, fetchTasks, createTask, updateTaskStatus } = useTasks();
   const { pendingCount, fetchApprovals } = useApprovals();
   const followUpNotes = useRef<Record<string, string>>({});
 
@@ -58,6 +59,18 @@ const Index = () => {
     if (selectedAgentId) setSelectedAgentId(null);
     if (showApprovals) setShowApprovals(false);
   }, [selectedAgentId, showApprovals]);
+
+  const handleBubbleAction = useCallback((agentId: string, action: 'chat' | 'resolve', taskId?: string) => {
+    if (action === 'chat') {
+      setSelectedAgentId(agentId);
+      if (showApprovals) setShowApprovals(false);
+      if (showActivity) setShowActivity(false);
+    } else if (action === 'resolve' && taskId) {
+      updateTaskStatus(taskId, TASK_STATUS.IN_PROGRESS);
+      toast.success('Task unblocked — agent will continue working');
+      refetchAgentStates();
+    }
+  }, [showApprovals, showActivity, updateTaskStatus, refetchAgentStates]);
 
   /*
    * Layout: The control room has three visual rows
@@ -124,6 +137,7 @@ const Index = () => {
                 isSelected={agent.id === selectedAgentId}
                 onClick={() => handleAgentClick(agent.id)}
                 dynamicState={states[agent.id]}
+                onBubbleAction={handleBubbleAction}
               />
             </div>
           ))}

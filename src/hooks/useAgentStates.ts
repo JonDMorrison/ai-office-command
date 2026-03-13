@@ -13,6 +13,8 @@ export interface AgentDynamicState {
   blinkOn: boolean;
   standupOverride?: string;
   activeTaskTitle?: string;
+  activeTaskId?: string;
+  activeTaskDescription?: string;
 }
 
 /**
@@ -27,21 +29,21 @@ export interface AgentDynamicState {
  */
 function deriveState(
   agentId: string,
-  tasksByAgent: Record<string, Array<{ status: string; title: string }>>,
+  tasksByAgent: Record<string, Array<{ status: string; title: string; id: string; description: string | null }>>,
   pendingApprovalAgents: Set<string>,
-): { state: DynamicState; activeTaskTitle?: string } {
+): { state: DynamicState; activeTaskTitle?: string; activeTaskId?: string; activeTaskDescription?: string } {
   const tasks = tasksByAgent[agentId] || [];
 
   const blocked = tasks.find(t => t.status === TASK_STATUS.BLOCKED);
-  if (blocked) return { state: 'blocked', activeTaskTitle: blocked.title };
+  if (blocked) return { state: 'blocked', activeTaskTitle: blocked.title, activeTaskId: blocked.id, activeTaskDescription: blocked.description ?? undefined };
 
   const needsInput = tasks.find(t => t.status === TASK_STATUS.WAITING_FOR_INPUT);
-  if (needsInput) return { state: 'needs_input', activeTaskTitle: needsInput.title };
+  if (needsInput) return { state: 'needs_input', activeTaskTitle: needsInput.title, activeTaskId: needsInput.id, activeTaskDescription: needsInput.description ?? undefined };
 
   if (pendingApprovalAgents.has(agentId)) return { state: 'waiting' };
 
   const working = tasks.find(t => t.status === TASK_STATUS.IN_PROGRESS || t.status === TASK_STATUS.QUEUED);
-  if (working) return { state: 'working', activeTaskTitle: working.title };
+  if (working) return { state: 'working', activeTaskTitle: working.title, activeTaskId: working.id, activeTaskDescription: working.description ?? undefined };
 
   return { state: 'idle' };
 }
@@ -69,7 +71,7 @@ export function useAgentStates() {
       // Fetch active tasks — use assigned_agent for ownership clarity
       const { data: taskData } = await (supabase
         .from('tasks' as any)
-        .select('agent_role, assigned_agent, status, title')
+        .select('id, agent_role, assigned_agent, status, title, description')
         .in('status', [
           TASK_STATUS.IN_PROGRESS,
           TASK_STATUS.QUEUED,
@@ -84,8 +86,8 @@ export function useAgentStates() {
         .select('agent_role')
         .eq('status', 'pending') as any);
 
-      const tasksByAgent: Record<string, Array<{ status: string; title: string }>> = {};
-      for (const t of (taskData || []) as Array<{ agent_role: string; assigned_agent: string | null; status: string; title: string }>) {
+      const tasksByAgent: Record<string, Array<{ status: string; title: string; id: string; description: string | null }>> = {};
+      for (const t of (taskData || []) as Array<{ id: string; agent_role: string; assigned_agent: string | null; status: string; title: string; description: string | null }>) {
         const owner = t.assigned_agent || t.agent_role;
         if (!tasksByAgent[owner]) tasksByAgent[owner] = [];
         tasksByAgent[owner].push(t);
@@ -113,12 +115,14 @@ export function useAgentStates() {
             delete overridesRef.current[agent.id];
           }
 
-          const { state, activeTaskTitle } = deriveState(agent.id, tasksByAgent, pendingApprovalAgents);
+          const { state, activeTaskTitle, activeTaskId, activeTaskDescription } = deriveState(agent.id, tasksByAgent, pendingApprovalAgents);
           next[agent.id] = {
             ...prev[agent.id],
             state,
             standupOverride: undefined,
             activeTaskTitle,
+            activeTaskId,
+            activeTaskDescription,
             // Rotate taskIndex when working
             taskIndex: state === 'working'
               ? (prev[agent.id].taskIndex + 1) % agent.tasks.length
