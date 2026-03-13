@@ -85,15 +85,15 @@ const Index = () => {
 
   // Agent order: [bloomsuite, clinicleader, projectpath, disc, inbox, executive]
   const deskPositions: React.CSSProperties[] = [
-    // Top row — workspace agents
-    { top: '4%', left: '6%' },                                              // bloomsuite
-    { top: '2%', left: '50%', transform: 'translateX(-50%)' },             // clinicleader (center-top)
-    { top: '4%', right: '6%' },                                             // projectpath
+    // Top row — workspace agents (pushed down to leave room for bubbles)
+    { top: '14%', left: '6%' },                                              // bloomsuite
+    { top: '12%', left: '50%', transform: 'translateX(-50%)' },             // clinicleader (center-top)
+    { top: '14%', right: '6%' },                                             // projectpath
     // Middle row — utility agents flanking executive
-    { top: '50%', left: '6%' },                                             // disc
-    { top: '50%', right: '6%' },                                            // inbox
+    { top: '54%', left: '6%' },                                             // disc
+    { top: '54%', right: '6%' },                                            // inbox
     // Executive — centered command position
-    { top: '46%', left: '50%', transform: 'translateX(-50%)' },             // executive
+    { top: '50%', left: '50%', transform: 'translateX(-50%)' },             // executive
   ];
 
   return (
