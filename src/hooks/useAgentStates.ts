@@ -115,12 +115,14 @@ export function useAgentStates() {
             delete overridesRef.current[agent.id];
           }
 
-          const { state, activeTaskTitle } = deriveState(agent.id, tasksByAgent, pendingApprovalAgents);
+          const { state, activeTaskTitle, activeTaskId, activeTaskDescription } = deriveState(agent.id, tasksByAgent, pendingApprovalAgents);
           next[agent.id] = {
             ...prev[agent.id],
             state,
             standupOverride: undefined,
             activeTaskTitle,
+            activeTaskId,
+            activeTaskDescription,
             // Rotate taskIndex when working
             taskIndex: state === 'working'
               ? (prev[agent.id].taskIndex + 1) % agent.tasks.length
