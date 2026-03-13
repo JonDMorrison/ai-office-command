@@ -4,6 +4,7 @@ import { useAgentStates } from '@/hooks/useAgentStates';
 import { useTasks } from '@/hooks/useTasks';
 import { useApprovals } from '@/hooks/useApprovals';
 import { TASK_STATUS } from '@/lib/constants';
+import { toast } from 'sonner';
 import HeaderBar from '@/components/office/HeaderBar';
 import PixelAgent from '@/components/office/PixelAgent';
 import ChatPanel, { Message, buildInitialMessages } from '@/components/office/ChatPanel';
