@@ -60,6 +60,18 @@ const Index = () => {
     if (showApprovals) setShowApprovals(false);
   }, [selectedAgentId, showApprovals]);
 
+  const handleBubbleAction = useCallback((agentId: string, action: 'chat' | 'resolve', taskId?: string) => {
+    if (action === 'chat') {
+      setSelectedAgentId(agentId);
+      if (showApprovals) setShowApprovals(false);
+      if (showActivity) setShowActivity(false);
+    } else if (action === 'resolve' && taskId) {
+      updateTaskStatus(taskId, TASK_STATUS.IN_PROGRESS);
+      toast.success('Task unblocked — agent will continue working');
+      refetchAgentStates();
+    }
+  }, [showApprovals, showActivity, updateTaskStatus, refetchAgentStates]);
+
   /*
    * Layout: The control room has three visual rows
    *
