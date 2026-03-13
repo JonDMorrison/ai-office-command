@@ -71,7 +71,7 @@ export function useAgentStates() {
       // Fetch active tasks — use assigned_agent for ownership clarity
       const { data: taskData } = await (supabase
         .from('tasks' as any)
-        .select('agent_role, assigned_agent, status, title')
+        .select('id, agent_role, assigned_agent, status, title, description')
         .in('status', [
           TASK_STATUS.IN_PROGRESS,
           TASK_STATUS.QUEUED,
