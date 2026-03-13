@@ -152,6 +152,17 @@ const Index = () => {
             onOpenSkills={() => setShowSkills(true)}
             onOpenApprovals={handleOpenApprovals}
             initialNote={followUpNotes.current[selectedAgent.id]}
+            messages={
+              conversationsRef.current[selectedAgent.id] ||
+              (() => {
+                const msgs = buildInitialMessages(selectedAgent, followUpNotes.current[selectedAgent.id]);
+                conversationsRef.current[selectedAgent.id] = msgs;
+                return msgs;
+              })()
+            }
+            onMessagesChange={(msgs) => {
+              conversationsRef.current[selectedAgent.id] = msgs;
+            }}
           />
         )}
 
