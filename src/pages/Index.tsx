@@ -62,6 +62,15 @@ const Index = () => {
 
   const handleBubbleAction = useCallback((agentId: string, action: 'chat' | 'resolve', taskId?: string) => {
     if (action === 'chat') {
+      // Seed conversation with task context if no existing conversation
+      const agent = agents.find(a => a.id === agentId);
+      const agentState = states[agentId];
+      if (agent && agentState?.activeTaskTitle && !conversationsRef.current[agentId]?.length) {
+        const taskContext = agentState.activeTaskDescription || `I need your help with "${agentState.activeTaskTitle}".`;
+        conversationsRef.current[agentId] = [
+          { role: 'assistant' as const, content: `I need your input on **${agentState.activeTaskTitle}**.\n\n${taskContext}\n\nHow would you like me to proceed?` },
+        ];
+      }
       setSelectedAgentId(agentId);
       if (showApprovals) setShowApprovals(false);
       if (showActivity) setShowActivity(false);
