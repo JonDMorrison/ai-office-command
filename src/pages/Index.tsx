@@ -137,6 +137,7 @@ const Index = () => {
                 isSelected={agent.id === selectedAgentId}
                 onClick={() => handleAgentClick(agent.id)}
                 dynamicState={states[agent.id]}
+                onBubbleAction={handleBubbleAction}
               />
             </div>
           ))}

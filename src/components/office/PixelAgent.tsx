@@ -1,5 +1,9 @@
+import { useState } from 'react';
 import { Agent } from '@/data/agents';
 import { AgentDynamicState } from '@/hooks/useAgentStates';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { MessageSquare, CheckCircle2, AlertTriangle } from 'lucide-react';
 
 import bloomsuiteImg from '@/assets/agent-bloomsuite-v2.png';
 import clinicleaderImg from '@/assets/agent-clinicleader-v2.png';
@@ -52,13 +56,16 @@ interface PixelAgentProps {
   isSelected: boolean;
   dynamicState: AgentDynamicState;
   isWalking?: boolean;
+  onBubbleAction?: (agentId: string, action: 'chat' | 'resolve', taskId?: string) => void;
 }
 
-const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = false }: PixelAgentProps) => {
-  const { state, taskIndex, standupOverride, activeTaskTitle } = dynamicState;
+const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = false, onBubbleAction }: PixelAgentProps) => {
+  const { state, taskIndex, standupOverride, activeTaskTitle, activeTaskId, activeTaskDescription } = dynamicState;
   const isActive = state === 'working' || state === 'needs_input' || state === 'blocked';
   const isExecutive = agent.id === 'executive';
   const isBlocked = state === 'blocked';
+  const isInteractive = state === 'needs_input' || state === 'blocked' || state === 'waiting';
+  const [popoverOpen, setPopoverOpen] = useState(false);
 
   const bubble = standupOverride
     ? { bg: 'hsl(142 76% 96%)', border: 'hsl(142 71% 45%)', label: '✦ Working on it...' }
@@ -67,6 +74,51 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
   const isWaitingApproval = state === 'waiting';
 
   const agentImage = AGENT_IMAGES[agent.id] || AGENT_IMAGES.bloomsuite;
+
+  const bubbleContent = (
+    <div
+      style={{
+        minWidth: '140px',
+        maxWidth: '200px',
+        padding: '6px 12px',
+        borderRadius: '10px',
+        backgroundColor: bubble.bg,
+        border: `2px solid ${bubble.border}`,
+        color: 'hsl(0 0% 10%)',
+        boxShadow: '0 4px 12px hsla(0, 0%, 0%, 0.1)',
+        cursor: isInteractive ? 'pointer' : 'default',
+      }}
+    >
+      <div style={{ fontSize: '12px', fontWeight: 600, lineHeight: 1.3, textAlign: 'center' }}>
+        {bubble.label}
+      </div>
+      {showTaskText && (
+        <div className="mt-0.5 truncate" style={{ fontSize: '10px', fontWeight: 400, color: 'hsl(0 0% 40%)', textAlign: 'center' }}>
+          {activeTaskTitle || agent.tasks[taskIndex]}
+        </div>
+      )}
+      <div
+        className="absolute bottom-0 left-1/2"
+        style={{
+          transform: 'translateX(-50%) translateY(100%)',
+          width: 0, height: 0,
+          borderLeft: '6px solid transparent',
+          borderRight: '6px solid transparent',
+          borderTop: `6px solid ${bubble.border}`,
+        }}
+      />
+    </div>
+  );
+
+  const getActionDescription = () => {
+    if (activeTaskDescription) return activeTaskDescription;
+    switch (state) {
+      case 'needs_input': return `${agent.name} needs your input to continue with "${activeTaskTitle || 'a task'}".`;
+      case 'blocked': return `${agent.name} is blocked on "${activeTaskTitle || 'a task'}" and needs help to proceed.`;
+      case 'waiting': return `${agent.name} has work awaiting your approval.`;
+      default: return '';
+    }
+  };
 
   return (
     <div
@@ -79,40 +131,71 @@ const PixelAgent = ({ agent, onClick, isSelected, dynamicState, isWalking = fals
         style={{ boxShadow: `0 0 28px 6px ${agent.colorHex}25, inset 0 0 0 2px ${agent.colorHex}30` }}
       />
 
-      {/* Status bubble — bounces when waiting for approval */}
-      <div
-        className={`absolute -top-14 left-1/2 z-20 ${isWaitingApproval ? 'animate-bubble-bounce' : 'animate-bubble-appear'}`}
-        style={{
-          transform: 'translateX(-50%)',
-          minWidth: '140px',
-          maxWidth: '200px',
-          padding: '6px 12px',
-          borderRadius: '10px',
-          backgroundColor: bubble.bg,
-          border: `2px solid ${bubble.border}`,
-          color: 'hsl(0 0% 10%)',
-          boxShadow: '0 4px 12px hsla(0, 0%, 0%, 0.1)',
-        }}
-      >
-        <div style={{ fontSize: '12px', fontWeight: 600, lineHeight: 1.3, textAlign: 'center' }}>
-          {bubble.label}
-        </div>
-        {showTaskText && (
-          <div className="mt-0.5 truncate" style={{ fontSize: '10px', fontWeight: 400, color: 'hsl(0 0% 40%)', textAlign: 'center' }}>
-            {activeTaskTitle || agent.tasks[taskIndex]}
-          </div>
-        )}
+      {/* Status bubble — interactive popover for actionable states */}
+      {isInteractive ? (
+        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+          <PopoverTrigger asChild>
+            <div
+              className={`absolute -top-14 left-1/2 z-20 ${isWaitingApproval ? 'animate-bubble-bounce' : 'animate-bubble-appear'}`}
+              style={{ transform: 'translateX(-50%)' }}
+              onClick={(e) => { e.stopPropagation(); }}
+            >
+              {bubbleContent}
+            </div>
+          </PopoverTrigger>
+          <PopoverContent
+            className="w-72 p-0 border-border shadow-lg"
+            side="top"
+            sideOffset={8}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" style={{ color: bubble.border }} />
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{activeTaskTitle || 'Action needed'}</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{getActionDescription()}</p>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="flex-1 text-xs"
+                  onClick={() => {
+                    setPopoverOpen(false);
+                    onBubbleAction?.(agent.id, 'chat', activeTaskId);
+                  }}
+                >
+                  <MessageSquare className="w-3 h-3 mr-1.5" />
+                  Respond
+                </Button>
+                {(state === 'needs_input' || state === 'blocked') && activeTaskId && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 text-xs"
+                    onClick={() => {
+                      setPopoverOpen(false);
+                      onBubbleAction?.(agent.id, 'resolve', activeTaskId);
+                    }}
+                  >
+                    <CheckCircle2 className="w-3 h-3 mr-1.5" />
+                    Mark Resolved
+                  </Button>
+                )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
+      ) : (
         <div
-          className="absolute bottom-0 left-1/2"
-          style={{
-            transform: 'translateX(-50%) translateY(100%)',
-            width: 0, height: 0,
-            borderLeft: '6px solid transparent',
-            borderRight: '6px solid transparent',
-            borderTop: `6px solid ${bubble.border}`,
-          }}
-        />
-      </div>
+          className={`absolute -top-14 left-1/2 z-20 ${isWaitingApproval ? 'animate-bubble-bounce' : 'animate-bubble-appear'}`}
+          style={{ transform: 'translateX(-50%)' }}
+        >
+          {bubbleContent}
+        </div>
+      )}
 
       {/* Character — state-driven animation */}
       <div
